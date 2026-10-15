@@ -92,7 +92,7 @@ def run_dupes(
         _find_broken_symlinks(paths, permanent, force_yes)
         return
 
-    console.print(Panel("[bold]macmon dupes[/] -- Duplicate File Finder", border_style="yellow"))
+    console.print(Panel("[bold]aegis dupes[/] -- Duplicate File Finder", border_style="yellow"))
 
     if keep_in:
         keep_in = str(Path(keep_in).expanduser().resolve())

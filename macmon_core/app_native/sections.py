@@ -397,7 +397,7 @@ class Overview(Section):
             row.addWidget(dt, 1)
             cl.addLayout(row)
         if len(checks) > 9:
-            cl.addWidget(label(f"+{len(checks) - 9} more (macmon health)", "faint"))
+            cl.addWidget(label(f"+{len(checks) - 9} more (aegis health)", "faint"))
         cl.addStretch(1)
         ring = Ring(d.get("score"))
         self.health_card.set_body(hbox(ring, col, spacing=theme.SP[4]))
@@ -568,7 +568,7 @@ class Processes(Section):
 
     def purge_funnel(self):
         body = [label("Runs sudo -n purge. Non-destructive: it flushes inactive memory and the disk cache (apps may feel cold "
-                      "for a moment). It never prompts -- it fails fast unless macmon sentinel --setup-purge installed the "
+                      "for a moment). It never prompts -- it fails fast unless aegis sentinel --setup-purge installed the "
                       "sudoers rule.", "text2", wrap=True)]
         self.shell.confirm(title="Purge inactive RAM?", body=body, ok="Purge", danger=False, on_ok=lambda _a: self._purge())
 
@@ -1031,7 +1031,7 @@ class Docker(Section):
     def prune_funnel(self):
         n = int(((self.data or {}).get("overview") or {}).get("dangling_images") or 0)
         body = [label("Runs docker image prune -f -- dangling (untagged, unreferenced) images only.", "text2", wrap=True),
-                info_line("Never -a, never containers, volumes, build cache or networks. Those stay in macmon docker --prune, "
+                info_line("Never -a, never containers, volumes, build cache or networks. Those stay in aegis docker --prune, "
                           "where you confirm them in the terminal.")]
         self.shell.confirm(title=f"Prune {n} dangling image{'' if n == 1 else 's'}?", body=body, ok="Prune",
                            on_ok=lambda _a: self._prune())
@@ -1175,7 +1175,7 @@ class Disk(Section):
 
 AUTO_WARN = {
     "auto_purge": ("Level 1, non-destructive: on memory pressure the sentinel runs sudo -n purge (needs the passwordless rule from "
-                   "macmon sentinel --setup-purge; skipped otherwise)."),
+                   "aegis sentinel --setup-purge; skipped otherwise)."),
     "auto_unload_ollama": "Level 1, non-destructive: idle ollama models are unloaded when RAM is critical. They reload on demand.",
     "auto_trim_fleet": ("Level 2: when RAM is critical the sentinel CLOSES idle AI sessions (keeps fleet_keep, resumable). Only sessions "
                         "idle for idle_samples in a row."),
@@ -1265,7 +1265,7 @@ class Sentinel(Section):
         self.status_card.set_body(status, kv_rows([
             ("weekly health agent", "macOS only" if weekly is None else "ACTIVE" if weekly else "STOPPED"),
             ("samples on disk", d.get("samples")), ("metrics", d.get("metrics_path")),
-            ("passwordless purge", ("configured" if d.get("purge_ready") else "not configured (macmon sentinel --setup-purge)")
+            ("passwordless purge", ("configured" if d.get("purge_ready") else "not configured (aegis sentinel --setup-purge)")
              if d.get("is_mac") else "macOS only")]))
         t = d.get("trends") or {}
         if not t.get("points"):
@@ -1380,7 +1380,7 @@ class Sentinel(Section):
         sw.setChecked(not want)        # revert: the engine's answer sets the real state
         if want:
             body = [warn_box(AUTO_WARN.get(key, key)),
-                    info_line("Writes sentinel.conf. Turn it off any time here or with macmon sentinel --disable-auto.")]
+                    info_line("Writes sentinel.conf. Turn it off any time here or with aegis sentinel --disable-auto.")]
             self.shell.confirm(title=f"Enable {key}?", body=body, ok="Enable", ack=ACK_OPT_IN,
                                on_ok=lambda acked: self._set_auto(key, True, sw) if acked else None)
         else:
@@ -1398,7 +1398,7 @@ class Sentinel(Section):
         else:
             self.toast(f"{key}: {'ON' if r.get('on') else 'OFF'}", "ember" if r.get("on") else "ok")
             if r.get("on") and key == "auto_purge" and r.get("purge_ready") is False:
-                self.toast("auto_purge is ON but passwordless purge is not configured: run macmon sentinel --setup-purge "
+                self.toast("auto_purge is ON but passwordless purge is not configured: run aegis sentinel --setup-purge "
                            "(until then it is skipped, notifications still fire).", "warn", 9000)
         self.load()
 

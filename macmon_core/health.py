@@ -30,7 +30,7 @@ def run_health(fix: bool = False, report: bool = False, json_out: bool = False):
         log_action("health", f"score={score}")
         return
 
-    console.print(Panel("[bold]macmon health[/] -- System Health Check", border_style="green"))
+    console.print(Panel("[bold]aegis health[/] -- System Health Check", border_style="green"))
 
     checks = _run_all_checks()
     score = _calculate_score(checks)
@@ -74,7 +74,7 @@ def _run_all_checks() -> list[dict]:
         "name": "Zombie Processes",
         "status": "fail" if zombies > 5 else "warn" if zombies > 0 else "pass",
         "detail": f"{zombies} zombie processes",
-        "fix_hint": f"Run `macmon sweep --zombies` to clean {zombies} zombies",
+        "fix_hint": f"Run `aegis sweep --zombies` to clean {zombies} zombies",
         "value": zombies,
     })
 
@@ -84,7 +84,7 @@ def _run_all_checks() -> list[dict]:
         "name": "RAM Usage",
         "status": "fail" if mem.percent > 88 else "warn" if mem.percent > 70 else "pass",
         "detail": f"{mem.percent:.1f}% used ({format_size(mem.used)}/{format_size(mem.total)})",
-        "fix_hint": "Run `macmon purge` or close heavy apps",
+        "fix_hint": "Run `aegis purge` or close heavy apps",
         "value": mem.percent,
     })
 
@@ -105,7 +105,7 @@ def _run_all_checks() -> list[dict]:
         "name": "Disk Free Space",
         "status": "fail" if disk_free_gb < 5 else "warn" if disk_free_gb < 15 else "pass",
         "detail": f"{format_size(disk.free)} free ({disk.percent}% used)",
-        "fix_hint": "Run `macmon clean --all` or `macmon gc --all`",
+        "fix_hint": "Run `aegis clean --all` or `aegis gc --all`",
         "value": disk_free_gb,
     })
 
@@ -127,7 +127,7 @@ def _run_all_checks() -> list[dict]:
             "name": "Broken Startup Items",
             "status": "fail" if broken_startup > 3 else "warn" if broken_startup > 0 else "pass",
             "detail": f"{broken_startup} broken items",
-            "fix_hint": "Run `macmon startup --broken` to review",
+            "fix_hint": "Run `aegis startup --broken` to review",
             "value": broken_startup,
         })
 
@@ -163,7 +163,7 @@ def _run_all_checks() -> list[dict]:
         "name": "node_modules Count",
         "status": "warn" if nm_count > 20 else "pass",
         "detail": f"~{nm_count} directories found",
-        "fix_hint": "Run `macmon gc --scan` to review",
+        "fix_hint": "Run `aegis gc --scan` to review",
         "value": nm_count,
     })
 
@@ -180,7 +180,7 @@ def _run_all_checks() -> list[dict]:
             "name": "Quarantine DB",
             "status": "warn" if qsize > 10 * 1024 * 1024 else "pass",
             "detail": format_size(qsize),
-            "fix_hint": "Run `macmon privacy --clean`",
+            "fix_hint": "Run `aegis privacy --clean`",
             "value": qsize,
         })
 
@@ -197,7 +197,7 @@ def _run_all_checks() -> list[dict]:
             "name": "Last Full Clean",
             "status": "warn" if hours_since > 168 else "pass",
             "detail": f"{hours_since:.0f} hours ago",
-            "fix_hint": "Run `macmon clean --all` for maintenance",
+            "fix_hint": "Run `aegis clean --all` for maintenance",
             "value": hours_since,
         })
     else:
@@ -205,7 +205,7 @@ def _run_all_checks() -> list[dict]:
             "name": "Last Full Clean",
             "status": "warn",
             "detail": "Never run",
-            "fix_hint": "Run `macmon clean --all` for first cleanup",
+            "fix_hint": "Run `aegis clean --all` for first cleanup",
             "value": 999,
         })
 
@@ -305,7 +305,7 @@ def _check_docker_usage():
         "name": "Docker Disk Usage",
         "status": "fail" if gb > 30 else "warn" if gb > 10 else "pass",
         "detail": f"{format_size(int(reclaimable))} reclaimable",
-        "fix_hint": "Run `macmon docker --prune`",
+        "fix_hint": "Run `aegis docker --prune`",
         "value": gb,
     }
 
@@ -398,7 +398,7 @@ def _save_report(score: int, checks: list[dict]):
     path = REPORTS_DIR / f"{ts}_health.txt"
 
     lines = [
-        f"macmon Health Report - {ts}",
+        f"AegisForge Health Report - {ts}",
         f"Score: {score}/100",
         "=" * 60,
     ]

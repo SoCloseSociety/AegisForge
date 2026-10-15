@@ -104,7 +104,7 @@ def _docker_overview(json_out: bool = False):
     if json_out:
         _docker_overview_json()
         return
-    console.print(Panel("[bold blue]macmon docker[/] -- Docker Overview", border_style="blue"))
+    console.print(Panel("[bold blue]aegis docker[/] -- Docker Overview", border_style="blue"))
 
     # System info
     out, _, rc = run_cmd(["docker", "system", "df"], timeout=15)
@@ -348,7 +348,7 @@ def _docker_stats():
 
 
 def _docker_prune(force_yes: bool = False):
-    console.print(Panel("[bold red]macmon docker --prune[/] -- Full Docker Cleanup", border_style="red"))
+    console.print(Panel("[bold red]aegis docker --prune[/] -- Full Docker Cleanup", border_style="red"))
 
     # Show what will be cleaned
     out, _, _ = run_cmd(["docker", "system", "df"], timeout=10)
@@ -513,7 +513,7 @@ def _list_compose(json_out: bool = False):
 
 
 def _docker_security_scan():
-    console.print(Panel("[bold red]macmon docker --scan[/] -- Docker Security Audit", border_style="red"))
+    console.print(Panel("[bold red]aegis docker --scan[/] -- Docker Security Audit", border_style="red"))
 
     findings = []
 

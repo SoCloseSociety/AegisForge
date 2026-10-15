@@ -54,14 +54,14 @@ def run_uninstaller(
         return
 
     if not app_name:
-        console.print("[yellow]Usage: macmon uninstall <AppName> or macmon uninstall --list[/]")
+        console.print("[yellow]Usage: aegis uninstall <AppName> or aegis uninstall --list[/]")
         return
 
     if not _valid_app_name(app_name):
         console.print(f"[red]Invalid app name {app_name!r}: pass a plain application name, not a path.[/]")
         return
 
-    console.print(Panel(f"[bold]macmon uninstall[/] -- {app_name}", border_style="red"))
+    console.print(Panel(f"[bold]aegis uninstall[/] -- {app_name}", border_style="red"))
 
     leftovers = _find_leftovers(app_name)
 
@@ -116,8 +116,8 @@ def run_uninstaller(
 def _valid_app_name(app_name: str) -> bool:
     """Reject anything that is a path rather than a bare application name.
 
-    Without this, `macmon uninstall .` resolves `/Applications/.` to
-    `/Applications` and `macmon uninstall ..` resolves it to `/` -- which
+    Without this, `aegis uninstall .` resolves `/Applications/.` to
+    `/Applications` and `aegis uninstall ..` resolves it to `/` -- which
     `--permanent -y` would then rmtree. A real app name never contains a path
     separator or a `..` segment.
     """

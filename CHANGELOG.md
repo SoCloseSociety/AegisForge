@@ -1,11 +1,18 @@
 # Changelog
 
-All notable changes to macmon are documented here.
+All notable changes to AegisForge (formerly macmon) are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed -- Renamed to AegisForge; CLI `aegis`, `macmon` kept as an alias
+- The product, the repo and the command are now **AegisForge** / `aegis` (owner decision 2026-10-15). The distribution was already `aegisforge`; `[project.scripts]` now declares `aegis = "macmon:app"` and keeps `macmon = "macmon:macmon_alias"` for at least one release.
+- `macmon` runs the same CLI with byte-identical stdout; on an interactive terminal it prints ONE rename line on stderr. A scheduled `macmon sentinel --sample` (launchd / cron / schtasks, stderr off a terminal) stays silent, so cron never mails it every minute. `install.sh` installs both wrappers (`/usr/local/bin/aegis` + `/usr/local/bin/macmon`, the latter marked with `AEGISFORGE_INVOKED_AS=macmon`).
+- The Sentinel scheduler (`sentinel.find_macmon`) prefers an `aegis` launcher only when the file is provably ours (it names `macmon.py` or imports `from macmon`), so an unrelated `aegis` binary on PATH is never scheduled; otherwise it falls back to the `macmon` launcher exactly as before.
+- Every printed hint, panel title and notification now says `aegis <command>` / AegisForge. Nothing else moves: state stays in `~/.macmon/`, the LaunchAgent labels (`co.soclose.macmon.*`), the pf anchor, the sudoers file, the notifier bundle id, the Python modules (`macmon.py`, `macmon_core`) and every file path are unchanged -- zero import breakage, existing installs keep working.
+- GitHub URLs moved to `SoCloseSociety/AegisForge` (README badges and clone commands, `pyproject.toml` URLs, the Android self-update manifest `MANIFEST_URL` and the `apkUrl` it serves; release asset names are unchanged). GitHub redirects the old URLs. README leads with the no-install one-liner `uvx --from git+https://github.com/SoCloseSociety/AegisForge aegis gc --scan`. CI also installs the package and runs `aegis` and `macmon`.
 
 ### Changed -- AegisForge.app bundle is ~3.5x smaller
 - `build_aegisforge.sh` now slims the frozen app: `--collect-all PySide6` bundled ALL of Qt (QtWebEngineCore alone ~285 MB, plus Qt3D / Quick / Qml / Multimedia / Charts / the Assistant/Designer/Linguist dev apps + the QML runtime), none of which a Qt Widgets app imports. The build prunes every framework, Python binding and plugin outside a keep-list (QtCore/Gui/Widgets + DBus/Svg/Network/PrintSupport/OpenGL + the cocoa platform plugin) before codesign: **~650 MB -> ~185 MB**. Verified the slimmed app still launches with all seven sections.
@@ -205,13 +212,13 @@ A Fable adversarial audit of the app, verified on real Windows (Python 3.14) and
 ### Added
 - Initial public release: a terminal-native macOS system monitor and cleaner -- 30 commands including a live TUI dashboard, process manager, system cleaner, dev garbage collector, security scanner, Docker manager, disk analyzer, duplicate finder, and an autopilot daemon. 100% local, zero telemetry, MIT licensed.
 
-[Unreleased]: https://github.com/SoCloseSociety/macmon/compare/v1.6.0...HEAD
-[1.6.0]: https://github.com/SoCloseSociety/macmon/compare/v1.5.1...v1.6.0
-[1.5.1]: https://github.com/SoCloseSociety/macmon/compare/v1.5.0...v1.5.1
-[1.5.0]: https://github.com/SoCloseSociety/macmon/compare/v1.4.0...v1.5.0
-[1.4.0]: https://github.com/SoCloseSociety/macmon/compare/v1.3.0...v1.4.0
-[1.3.0]: https://github.com/SoCloseSociety/macmon/compare/v1.2.1...v1.3.0
-[1.2.1]: https://github.com/SoCloseSociety/macmon/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/SoCloseSociety/macmon/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/SoCloseSociety/macmon/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/SoCloseSociety/macmon/releases/tag/v1.0.0
+[Unreleased]: https://github.com/SoCloseSociety/AegisForge/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/SoCloseSociety/AegisForge/compare/v1.5.1...v1.6.0
+[1.5.1]: https://github.com/SoCloseSociety/AegisForge/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/SoCloseSociety/AegisForge/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/SoCloseSociety/AegisForge/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/SoCloseSociety/AegisForge/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/SoCloseSociety/AegisForge/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/SoCloseSociety/AegisForge/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/SoCloseSociety/AegisForge/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/SoCloseSociety/AegisForge/releases/tag/v1.0.0

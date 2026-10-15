@@ -11,13 +11,13 @@ actions are explicit menu clicks only; nothing here ever auto-kills a workload.
 Actions reach the engine two ways. Frozen (the PyInstaller .app) there is no
 interpreter to spawn -- ``sys.executable`` IS the app and ``macmon.py`` is not
 in the bundle -- so they call the engine's functions in-process on a worker
-thread. In dev mode they run the installed ``macmon`` launcher (else this
+thread. In dev mode they run the installed ``aegis`` (or legacy ``macmon``) launcher (else this
 interpreter on the repo's ``macmon.py``) as a subprocess. Either way the
 outcome is reported by notification: a menu-bar app has no console, so nothing
 here may fail silently.
 
 Optional dependency: ``rumps`` (a thin wrapper over pyobjc/NSStatusBar). It is
-NOT a core runtime dep of the macmon CLI -- install it with ``pip install
+NOT a core runtime dep of the aegis CLI -- install it with ``pip install
 -e ".[app]"`` or via ``build_aegisforge.sh`` which freezes this into
 ``AegisForge.app`` with PyInstaller. Run in dev mode with
 ``python -m macmon_core.app_menubar``.
@@ -219,7 +219,7 @@ def _last_line(text: str) -> str:
 
 
 def _in_process(args: list[str]):
-    """The in-process form of ``macmon <args>`` for the frozen app: the bundle
+    """The in-process form of ``aegis <args>`` for the frozen app: the bundle
     has no interpreter to spawn (``sys.executable`` IS the app -- spawning it
     just opened a second AegisForge) and no ``macmon.py``, so each action calls
     the engine function the CLI subcommand would. None for anything else."""
@@ -234,7 +234,7 @@ def _in_process(args: list[str]):
 
 
 def _cli_command(args: list[str]):
-    """argv for ``macmon <args>`` outside the frozen app: the installed launcher
+    """argv for ``aegis <args>`` outside the frozen app: the installed launcher
     when there is one, else this interpreter on the repo's macmon.py. None when
     neither exists (the caller notifies -- never silent)."""
     exe = sentinel.find_macmon()
@@ -249,7 +249,7 @@ def _cli_command(args: list[str]):
 def _run_action(args: list[str]):
     """The worker body (synchronous; unit-tested directly). Frozen: in-process.
     Dev: a subprocess. Either way the outcome is reported, never swallowed."""
-    label = "macmon " + " ".join(args)
+    label = "aegis " + " ".join(args)
     try:
         if getattr(sys, "frozen", False):
             fn = _in_process(args)
@@ -262,7 +262,7 @@ def _run_action(args: list[str]):
             return
         cmd = _cli_command(args)
         if cmd is None:
-            _notify(f"{aegis.BRAND}: macmon not found",
+            _notify(f"{aegis.BRAND}: aegis not found",
                     f"Install the CLI (install.sh or pip install -e .) to run {label}.")
             return
         r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True, timeout=600)
@@ -319,15 +319,15 @@ def open_dashboard(_=None):
 def clean_caches(_=None):
     # Destructive => explicit: this dialog is the confirmation that `-y` skips.
     if not _confirm("Clean caches?",
-                    "Runs 'macmon clean --all': system, browser, app and user caches go "
+                    "Runs 'aegis clean --all': system, browser, app and user caches go "
                     "to the Trash (nothing is deleted permanently).", ok="Clean"):
         return
     _run_cli(["clean", "--all", "-y"])
 
 
 def purge_ram(_=None):
-    # `macmon purge` runs `sudo -n purge`: it never prompts (there is no GUI
-    # password dialog for it) and fails fast unless `macmon sentinel
+    # `aegis purge` runs `sudo -n purge`: it never prompts (there is no GUI
+    # password dialog for it) and fails fast unless `aegis sentinel
     # --setup-purge` installed the sudoers rule. The outcome is notified.
     _run_cli(["purge"])
 
@@ -414,7 +414,7 @@ if rumps is not None:  # pragma: no cover - requires a GUI session
 def main():
     if rumps is None:
         print("AegisForge.app needs the menu-bar extra: pip install -e \".[app]\" "
-              "(rumps). The CLI works without it: `macmon sentinel`.", file=sys.stderr)
+              "(rumps). The CLI works without it: `aegis sentinel`.", file=sys.stderr)
         return 1
     AegisForgeApp().run()
     return 0

@@ -1,4 +1,4 @@
-"""AegisForge -- the proactive, anticipatory layer on top of the macmon sentinel.
+"""AegisForge -- the proactive, anticipatory layer on top of the aegis sentinel.
 
 macmon is the engine (the `macmon` CLI, the `macmon_core` package, the 60s
 single-shot sampler). AegisForge is the experience forged on top of it: the
@@ -733,7 +733,7 @@ def detect_load(t: dict, cfg: dict):
     top = ", ".join(f"{nm} {pct:.0f}%" for nm, pct, _ in (t.get("topn") or [])[:3]) or "n/a"
     return Finding("load", "load catastrophe",
                    f"Load {ld['load1']:.1f} on {ld['ncpu']} cores ({ld['ratio']:.1f}x) for {ld['sustained']} samples "
-                   f"-- top CPU: {top}. Not auto-acted: inspect with 'macmon ps --sort cpu'.",
+                   f"-- top CPU: {top}. Not auto-acted: inspect with 'aegis ps --sort cpu'.",
                    900, "critical")
 
 
@@ -759,7 +759,7 @@ def detect_swarm(t: dict, cfg: dict) -> list:
         if v["count"] >= s_min and v["growth"] >= s_growth:
             out.append(Finding(f"swarm:{name}", "process swarm",
                                f"{v['count']} '{name}' processes (+{v['growth']} in {span} min) -- an executable is "
-                               f"multiplying. Not auto-killed (live workload); check 'macmon ps --tree'.",
+                               f"multiplying. Not auto-killed (live workload); check 'aegis ps --tree'.",
                                900, "high"))
     return out
 
@@ -773,7 +773,7 @@ def detect_leaks(t: dict, cfg: dict):
     if _bool(cfg, "auto_reap_orphans"):
         tail = f"Auto-reap is ON: idle ones are reaped after {_int(cfg, 'reap_idle_samples', 5, lo=1)} samples."
     else:
-        tail = "Auto-reap is OFF: run 'macmon sentinel --reap-orphans', or enable with --enable-auto --reap."
+        tail = "Auto-reap is OFF: run 'aegis sentinel --reap-orphans', or enable with --enable-auto --reap."
     return Finding("leaks", "leaked orphans",
                    f"{lk['leak']} leaked dev processes (parent exited, reparented to PID 1{growth}): {names}. {tail}",
                    1800, "medium")
@@ -936,7 +936,7 @@ def reap_leaks(leaks: list[dict], cfg: dict, astate: dict, now: float, auto: boo
     if not reaped:
         if auto and spared:
             return [("orphan_workers", f"{spared} leaked orphan(s) look like periodic workers (a home script): "
-                                       f"left for review -- 'macmon sentinel --reap-orphans'")]
+                                       f"left for review -- 'aegis sentinel --reap-orphans'")]
         return []
     astate["_reap"] = now
     names = Counter((L.get("name") or "?")[:_NAME_W] for L in reaped)

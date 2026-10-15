@@ -193,7 +193,7 @@ class MainWindow(QMainWindow):
         self.bridge = QLabel("engine: in-process (native)")
         self.bridge.setObjectName("engine")
         fl.addWidget(self.bridge)
-        eng = QLabel("engine: macmon sentinel")
+        eng = QLabel("engine: aegis sentinel")
         eng.setObjectName("engine")
         fl.addWidget(eng)
         seg = QFrame()

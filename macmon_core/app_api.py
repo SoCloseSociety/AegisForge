@@ -150,7 +150,7 @@ def _is_webkit_render(name: str) -> bool:
     launchd, so their ppid is 1 -- ``_is_own_process_tree`` never reaches them by
     ancestry, yet AegisForge's own window IS one of them: suspending or killing it
     freezes / tears down the app. They are never a useful target from a GUI system
-    tool (the CLI ``macmon kill`` can still reach one by PID), so the bridge
+    tool (the CLI ``aegis kill`` can still reach one by PID), so the bridge
     refuses the whole family."""
     return (name or "").lower().startswith("com.apple.webkit.")
 
@@ -253,7 +253,7 @@ class Api:
 
     def purge_ram(self) -> dict:
         """``sudo -n purge`` -- never prompts; fails fast unless the sudoers
-        rule from ``macmon sentinel --setup-purge`` is installed."""
+        rule from ``aegis sentinel --setup-purge`` is installed."""
         if sys.platform != "darwin":
             return {"ok": False, "refused": "os", "detail": "Purge inactive RAM is macOS only."}
         with engine_call() as cap:

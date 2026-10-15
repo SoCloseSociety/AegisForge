@@ -10,7 +10,7 @@ from .utils import CONFIG_PATH, console, ensure_dirs, log_action
 try:
     import tomllib
 except ImportError as e:
-    raise ImportError("macmon requires Python 3.11+ (tomllib not available)") from e
+    raise ImportError("AegisForge (aegis) requires Python 3.11+ (tomllib not available)") from e
 
 DEFAULT_CONFIG = """\
 # macmon configuration
@@ -102,11 +102,11 @@ def init_config():
 
 def show_config():
     if not CONFIG_PATH.exists():
-        console.print("[yellow]No config found. Run `macmon config --init` first.[/yellow]")
+        console.print("[yellow]No config found. Run `aegis config --init` first.[/yellow]")
         return
     content = CONFIG_PATH.read_text()
     syntax = Syntax(content, "toml", theme="monokai", line_numbers=True)
-    console.print(Panel(syntax, title="macmon config", border_style="cyan"))
+    console.print(Panel(syntax, title="aegis config", border_style="cyan"))
 
 
 def _render_value(value: str) -> str:

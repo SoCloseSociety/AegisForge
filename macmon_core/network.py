@@ -17,7 +17,7 @@ def run_network(
     process: str = None,
     json_out: bool = False,
 ):
-    console.print(Panel("[bold]macmon network[/] -- Network Connections", border_style="blue"))
+    console.print(Panel("[bold]aegis network[/] -- Network Connections", border_style="blue"))
 
     connections = []
 

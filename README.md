@@ -2,15 +2,21 @@
   <img src="https://raw.githubusercontent.com/SoCloseSociety/.github/main/assets/org-banner.svg" alt="SoClose Society" width="900">
 </p>
 
-<h1 align="center">macmon — the free, open-source Mac cleaner &amp; system monitor for developers</h1>
+<h1 align="center">AegisForge -- the free, open-source Mac cleaner &amp; system monitor for developers</h1>
+
+```bash
+uvx --from git+https://github.com/SoCloseSociety/AegisForge aegis gc --scan
+```
+
+<p align="center"><em>(formerly macmon)</em> -- the line above runs it with no install (needs <a href="https://docs.astral.sh/uv/">uv</a>); the command is <code>aegis</code>.</p>
 
 <p align="center">
-  <strong>A terminal-native macOS system monitor, cleaner and optimizer — a free, private, open-source CCleaner alternative built for developers. 100% local, zero telemetry.</strong>
+  <strong>A terminal-native macOS system monitor, cleaner and optimizer -- a free, private, open-source CCleaner alternative built for developers. 100% local, zero telemetry.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/SoCloseSociety/macmon/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SoCloseSociety/macmon/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"></a>
-  <a href="https://github.com/SoCloseSociety/macmon/stargazers"><img src="https://img.shields.io/github/stars/SoCloseSociety/macmon?style=flat-square&color=575ECF" alt="Stars"></a>
+  <a href="https://github.com/SoCloseSociety/AegisForge/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SoCloseSociety/AegisForge/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"></a>
+  <a href="https://github.com/SoCloseSociety/AegisForge/stargazers"><img src="https://img.shields.io/github/stars/SoCloseSociety/AegisForge?style=flat-square&color=575ECF" alt="Stars"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-575ECF?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/macOS-12%2B-575ECF?style=flat-square&logo=apple&logoColor=white" alt="macOS 12+">
   <img src="https://img.shields.io/badge/Windows%20%7C%20Linux-core-575ECF?style=flat-square" alt="Windows and Linux core support">
@@ -25,39 +31,39 @@
   <a href="#installation">Install</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#screenshots">Screenshots</a> &bull;
-  <a href="#macmon-sentinel">Sentinel</a> &bull;
+  <a href="#sentinel-always-on-monitor">Sentinel</a> &bull;
   <a href="#features">Features</a> &bull;
   <a href="#command-reference">Commands</a> &bull;
   <a href="https://soclose.co">SoClose</a>
 </p>
 
 <p align="center">
-  <img src="assets/sentinel.svg" alt="macmon sentinel — real-time tactical system monitor for macOS" width="820">
+  <img src="assets/sentinel.svg" alt="aegis sentinel -- real-time tactical system monitor for macOS" width="820">
 </p>
 
 ---
 
-## What is macmon?
+## What is AegisForge?
 
-**macmon** is a **free, open-source Mac system monitor and cleaner** that runs entirely in your terminal. Think **CCleaner Pro + Activity Monitor + Security Scanner + Docker Manager**, reimagined as one fast CLI with a live TUI dashboard — purpose-built for developers who live in the shell.
+**AegisForge** (CLI: `aegis`, formerly `macmon`) is a **free, open-source Mac system monitor and cleaner** that runs entirely in your terminal. Think **CCleaner Pro + Activity Monitor + Security Scanner + Docker Manager**, reimagined as one fast CLI with a live TUI dashboard -- purpose-built for developers who live in the shell.
 
-If you have ever searched for *"how to clean my Mac"*, *"free CCleaner alternative for macOS"*, *"free up disk space on Mac"*, *"why is my Mac slow"*, or *"macOS system monitor CLI"* — this is the tool, and it never phones home.
+If you have ever searched for *"how to clean my Mac"*, *"free CCleaner alternative for macOS"*, *"free up disk space on Mac"*, *"why is my Mac slow"*, or *"macOS system monitor CLI"* -- this is the tool, and it never phones home.
 
-**30 commands** · **21 modules** · **Live dashboard** · **MACMON-SENTINEL always-on watchdog** · **Keyboard shortcuts that execute real actions** · **Autopilot daemon** · **Thermal management** · **Security &amp; malware scanner** · **Docker manager** · **100% local, zero telemetry**
+**30 commands** · **21 modules** · **Live dashboard** · **Sentinel always-on watchdog** · **Keyboard shortcuts that execute real actions** · **Autopilot daemon** · **Thermal management** · **Security &amp; malware scanner** · **Docker manager** · **100% local, zero telemetry**
 
-### Why developers pick macmon
+### Why developers pick AegisForge
 
-- **Free &amp; open source (MIT)** — no license, no account, no upsell, no cloud.
-- **Private by design** — everything runs locally; nothing is uploaded, ever.
-- **Developer-first cleanup** — reclaims `node_modules`, stale venvs, Docker cache, Xcode/DerivedData, npm/pip/brew caches with safety guards.
-- **Safe deletes** — moves to Trash by default and never silently escalates to permanent deletion.
-- **One binary of a habit** — monitor, clean, secure and keep your Mac fast from a single CLI.
+- **Free &amp; open source (MIT)** -- no license, no account, no upsell, no cloud.
+- **Private by design** -- everything runs locally; nothing is uploaded, ever.
+- **Developer-first cleanup** -- reclaims `node_modules`, stale venvs, Docker cache, Xcode/DerivedData, npm/pip/brew caches with safety guards.
+- **Safe deletes** -- moves to Trash by default and never silently escalates to permanent deletion.
+- **One binary of a habit** -- monitor, clean, secure and keep your Mac fast from a single CLI.
 
 ---
 
 ## Platform support
 
-macmon is **macOS-first** (that is where every feature works), with a
+AegisForge is **macOS-first** (that is where every feature works), with a
 **cross-platform core** so the portable tools also run on Windows and Linux.
 On other platforms, macOS-only commands degrade gracefully with a clear
 "requires macOS" message instead of crashing.
@@ -89,9 +95,10 @@ cross-platform layer. `clean --browsers` still uses macOS browser-profile paths
 pnpm / yarn / bun) is cross-platform, and the pip cache is resolved per OS
 (`~/Library/Caches/pip`, `%LOCALAPPDATA%\pip\Cache`, `$XDG_CACHE_HOME/pip`).
 
-On Windows/Linux install by cloning + `pip install -r requirements.txt`, then
-`python macmon.py`. The macOS `install.sh` sets up the `macmon` shortcut on
-macOS/Linux.
+On Windows/Linux install with `uvx` / `pipx` / `pip` (see [Installation](#installation)),
+or clone + `pip install -r requirements.txt` and run `python macmon.py` (the
+entry script keeps its historical name). The `install.sh` script sets up the
+`aegis` command on macOS/Linux.
 
 ---
 
@@ -101,26 +108,26 @@ macOS/Linux.
 <tr>
 <td width="50%" valign="top" align="center">
 <strong>System health, scored /100</strong><br>
-<img src="assets/health.svg" alt="macmon health — macOS system health check with a score out of 100" width="100%">
+<img src="assets/health.svg" alt="aegis health -- macOS system health check with a score out of 100" width="100%">
 </td>
 <td width="50%" valign="top" align="center">
 <strong>One-pass junk &amp; cache cleaner</strong><br>
-<img src="assets/clean.svg" alt="macmon clean — free up disk space on macOS by clearing caches, logs and temp files" width="100%">
+<img src="assets/clean.svg" alt="aegis clean -- free up disk space on macOS by clearing caches, logs and temp files" width="100%">
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top" align="center">
 <strong>Security &amp; malware audit</strong><br>
-<img src="assets/security.svg" alt="macmon security — macOS network security, firewall and malware indicator scan" width="100%">
+<img src="assets/security.svg" alt="aegis security -- macOS network security, firewall and malware indicator scan" width="100%">
 </td>
 <td width="50%" valign="top" align="center">
 <strong>Categorized process monitor</strong><br>
-<img src="assets/ps.svg" alt="macmon ps — developer process monitor for macOS grouped by category" width="100%">
+<img src="assets/ps.svg" alt="aegis ps -- developer process monitor for macOS grouped by category" width="100%">
 </td>
 </tr>
 </table>
 
-> Above: the **MACMON-SENTINEL** tactical console (top of page). All output is real, rendered live — no mockups.
+> Above: the **Sentinel** tactical console (top of page). All output is real, rendered live -- no mockups.
 
 ---
 
@@ -250,11 +257,11 @@ Background rules engine:
 <td width="33%" valign="top">
 
 ### More Tools
-- **Startup Manager** — LaunchAgents, daemons, cron
-- **App Uninstaller** — full leftover detection
-- **Duplicate Finder** — 3-phase xxhash + SHA-256
-- **Disk Analyzer** — big files, categorization
-- **Focus Mode** — quit apps, DND, restore
+- **Startup Manager** -- LaunchAgents, daemons, cron
+- **App Uninstaller** -- full leftover detection
+- **Duplicate Finder** -- 3-phase xxhash + SHA-256
+- **Disk Analyzer** -- big files, categorization
+- **Focus Mode** -- quit apps, DND, restore
 
 </td>
 </tr>
@@ -264,11 +271,23 @@ Background rules engine:
 
 ## Installation
 
+### Option 0 -- no install (uvx)
+
+Run any command straight from GitHub in a throwaway environment
+([uv](https://docs.astral.sh/uv/) required):
+
+```bash
+uvx --from git+https://github.com/SoCloseSociety/AegisForge aegis gc --scan
+uvx --from git+https://github.com/SoCloseSociety/AegisForge aegis health
+```
+
+Keep it around with `uv tool install git+https://github.com/SoCloseSociety/AegisForge`.
+
 ### Option 1 -- install script (recommended)
 
 ```bash
-git clone https://github.com/SoCloseSociety/macmon.git
-cd macmon
+git clone https://github.com/SoCloseSociety/AegisForge.git
+cd AegisForge
 bash install.sh
 ```
 
@@ -276,17 +295,17 @@ This will:
 1. Check Python 3.11+
 2. Create a venv at `~/.macmon/venv`
 3. Install dependencies (`rich`, `psutil`, `typer`, `send2trash`, `xxhash`)
-4. Create `/usr/local/bin/macmon` wrapper
+4. Create the `/usr/local/bin/aegis` wrapper (plus `/usr/local/bin/macmon`, the deprecated alias)
 5. Initialize config at `~/.macmon/config.toml`
 
 ### Option 2 -- pip
 
-macmon is a standard Python package (`pyproject.toml`), so it installs with pip
-into any Python 3.11+ environment and puts the `macmon` command on your PATH:
+AegisForge is a standard Python package (`pyproject.toml`), so it installs with
+pip into any Python 3.11+ environment and puts the `aegis` command on your PATH:
 
 ```bash
-git clone https://github.com/SoCloseSociety/macmon.git
-cd macmon
+git clone https://github.com/SoCloseSociety/AegisForge.git
+cd AegisForge
 pip install .
 ```
 
@@ -298,9 +317,17 @@ pipx install .
 
 For development, use an editable install: `pip install -e .`
 
-PyPI release planned under the brand name (the `macmon` name on PyPI belongs to
-an unrelated project): `pip install aegisforge` will install the same `macmon`
+PyPI release planned: `pip install aegisforge` will install the same `aegis`
 command once published.
+
+### Renamed from macmon
+
+The project was called **macmon** until 1.6.x. The command is now `aegis`;
+`macmon` is still installed as an alias for at least one release (same
+commands, same output, plus a one-line rename notice on an interactive
+terminal). Nothing else moves: state and config stay in `~/.macmon/`, the
+Sentinel LaunchAgent keeps its label, and the Python package stays
+`macmon_core`. Old GitHub URLs (`SoCloseSociety/macmon`) redirect here.
 
 ### Build DMG (optional)
 
@@ -315,34 +342,34 @@ open dist/macmon.dmg
 
 ```bash
 # Launch the live dashboard
-macmon
+aegis
 
 # Full system clean
-macmon clean --all -y
+aegis clean --all -y
 
 # Dev garbage collector
-macmon gc --all -y
+aegis gc --all -y
 
 # Security audit
-macmon security
+aegis security
 
 # Health check + auto-fix
-macmon health --fix
+aegis health --fix
 
 # Kill zombies & orphans
-macmon sweep -y
+aegis sweep -y
 
 # Purge RAM
-macmon purge
+aegis purge
 
 # Start autopilot daemon
-macmon auto --start
+aegis auto --start
 
 # Focus mode
-macmon focus
+aegis focus
 
 # All commands
-macmon --help
+aegis --help
 ```
 
 ---
@@ -351,59 +378,59 @@ macmon --help
 
 | Command | Description |
 |---------|-------------|
-| `macmon` | Live dashboard |
-| `macmon ps` | Process list with categories |
-| `macmon kill <target>` | Kill process |
-| `macmon suspend / resume <target>` | Suspend / resume process |
-| `macmon nice <target> <val>` | Renice process |
-| `macmon quit / restart <app>` | Graceful quit / restart app |
-| `macmon sweep` | Kill zombies, orphans, stale locks |
-| `macmon ports` | Port manager |
-| `macmon clean --scan` | Preview cleanable junk |
-| `macmon clean --all -y` | Full system clean |
-| `macmon clean --browsers` | Browser cleaner |
-| `macmon gc --scan` | Preview dev garbage |
-| `macmon gc --all -y` | Full dev GC |
-| `macmon privacy --scan` | Preview privacy traces |
-| `macmon privacy --full -y` | Wipe all traces |
-| `macmon health` | Health check /100 |
-| `macmon health --fix` | Auto-fix safe issues |
-| `macmon startup --list` | List startup items |
-| `macmon startup --audit` | Audit suspicious items |
-| `macmon uninstall <app>` | Uninstall + leftover cleanup |
-| `macmon dupes <path>` | Find duplicate files |
-| `macmon bigfiles` | Find large files |
-| `macmon disk` | Disk usage analyzer |
-| `macmon network` | Network connections |
-| `macmon flush-dns` | Flush DNS cache |
-| `macmon security` | Security audit /100 |
-| `macmon security --block-ip <ip>` | Block IP via pf firewall |
-| `macmon security --quarantine <proc>` | Kill + block process |
-| `macmon docker` | Docker overview |
-| `macmon docker --prune -y` | Docker full cleanup |
-| `macmon docker --scan` | Docker security audit |
-| `macmon auto --start / --stop` | Start / stop autopilot daemon |
-| `macmon focus / restore` | Focus mode on / off |
-| `macmon purge` | Purge inactive RAM |
-| `macmon report` | Session report |
-| `macmon config --show / --edit` | View / edit config |
-| `macmon sentinel --install` | Arm the always-on light monitor |
-| `macmon sentinel` | Tactical console snapshot |
-| `macmon sentinel --watch` | Live tactical console |
-| `macmon sentinel --force-clean` | Manual override: scan then clean |
-| `macmon sentinel --test-notify` | Test notification (shows the AegisForge icon) |
-| `macmon sentinel --enable-auto` | Enable safe auto-remediation (unload idle ollama models + RAM purge) |
-| `macmon sentinel --enable-auto --aggressive` | Also auto-close idle AI sessions |
-| `macmon sentinel --enable-auto --reap` | Also auto-reap PROVEN leaked orphans (PID 1 + parent watched dying) |
-| `macmon sentinel --disable-auto` | Disable all auto-remediation (back to notify-only) |
-| `macmon sentinel --trim` | Close idle AI sessions now |
-| `macmon sentinel --reap-orphans` | List proven leaked orphans and reap them now (asks first) |
-| `macmon sentinel --unload-ollama` | Unload idle ollama models now (they reload on demand) |
-| `macmon sentinel --setup-purge` | Grant passwordless `purge` via sudoers so auto-purge runs unattended |
+| `aegis` | Live dashboard |
+| `aegis ps` | Process list with categories |
+| `aegis kill <target>` | Kill process |
+| `aegis suspend / resume <target>` | Suspend / resume process |
+| `aegis nice <target> <val>` | Renice process |
+| `aegis quit / restart <app>` | Graceful quit / restart app |
+| `aegis sweep` | Kill zombies, orphans, stale locks |
+| `aegis ports` | Port manager |
+| `aegis clean --scan` | Preview cleanable junk |
+| `aegis clean --all -y` | Full system clean |
+| `aegis clean --browsers` | Browser cleaner |
+| `aegis gc --scan` | Preview dev garbage |
+| `aegis gc --all -y` | Full dev GC |
+| `aegis privacy --scan` | Preview privacy traces |
+| `aegis privacy --full -y` | Wipe all traces |
+| `aegis health` | Health check /100 |
+| `aegis health --fix` | Auto-fix safe issues |
+| `aegis startup --list` | List startup items |
+| `aegis startup --audit` | Audit suspicious items |
+| `aegis uninstall <app>` | Uninstall + leftover cleanup |
+| `aegis dupes <path>` | Find duplicate files |
+| `aegis bigfiles` | Find large files |
+| `aegis disk` | Disk usage analyzer |
+| `aegis network` | Network connections |
+| `aegis flush-dns` | Flush DNS cache |
+| `aegis security` | Security audit /100 |
+| `aegis security --block-ip <ip>` | Block IP via pf firewall |
+| `aegis security --quarantine <proc>` | Kill + block process |
+| `aegis docker` | Docker overview |
+| `aegis docker --prune -y` | Docker full cleanup |
+| `aegis docker --scan` | Docker security audit |
+| `aegis auto --start / --stop` | Start / stop autopilot daemon |
+| `aegis focus / restore` | Focus mode on / off |
+| `aegis purge` | Purge inactive RAM |
+| `aegis report` | Session report |
+| `aegis config --show / --edit` | View / edit config |
+| `aegis sentinel --install` | Arm the always-on light monitor |
+| `aegis sentinel` | Tactical console snapshot |
+| `aegis sentinel --watch` | Live tactical console |
+| `aegis sentinel --force-clean` | Manual override: scan then clean |
+| `aegis sentinel --test-notify` | Test notification (shows the AegisForge icon) |
+| `aegis sentinel --enable-auto` | Enable safe auto-remediation (unload idle ollama models + RAM purge) |
+| `aegis sentinel --enable-auto --aggressive` | Also auto-close idle AI sessions |
+| `aegis sentinel --enable-auto --reap` | Also auto-reap PROVEN leaked orphans (PID 1 + parent watched dying) |
+| `aegis sentinel --disable-auto` | Disable all auto-remediation (back to notify-only) |
+| `aegis sentinel --trim` | Close idle AI sessions now |
+| `aegis sentinel --reap-orphans` | List proven leaked orphans and reap them now (asks first) |
+| `aegis sentinel --unload-ollama` | Unload idle ollama models now (they reload on demand) |
+| `aegis sentinel --setup-purge` | Grant passwordless `purge` via sudoers so auto-purge runs unattended |
 
 ---
 
-## MACMON-SENTINEL (always-on monitor)
+## Sentinel (always-on monitor)
 
 An ultra-light watchdog that keeps the Mac operational without you watching it.
 
@@ -435,20 +462,20 @@ An ultra-light watchdog that keeps the Mac operational without you watching it.
     (Claude Code) beyond a configurable minimum (`fleet_keep`), protecting the
     most recently active ones so the session you are using is never touched. A
     session must be idle for `idle_samples` samples (~10 min) first, and sessions
-    are resumable (`--resume`). **Requires `macmon sentinel --enable-auto --aggressive`.**
-  - Turn everything back off with `macmon sentinel --disable-auto` (notify-only).
-  - Manual levers any time: `macmon sentinel --trim` closes idle sessions now,
-    `macmon sentinel --unload-ollama` unloads idle ollama models now.
+    are resumable (`--resume`). **Requires `aegis sentinel --enable-auto --aggressive`.**
+  - Turn everything back off with `aegis sentinel --disable-auto` (notify-only).
+  - Manual levers any time: `aegis sentinel --trim` closes idle sessions now,
+    `aegis sentinel --unload-ollama` unloads idle ollama models now.
 
 > **Heads-up:** `--enable-auto` enables levels 1a **and** 1b. That means once RAM
-> is critical, macmon may unload your loaded ollama models without asking. It is
+> is critical, the Sentinel may unload your loaded ollama models without asking. It is
 > non-destructive (they reload on demand, and never mid-inference), but if you
 > want notifications only, do not run `--enable-auto`.
 
 ### Passwordless purge (`--setup-purge`)
 
 `purge` requires root, so unattended `auto_purge` needs sudo without a password
-prompt. `macmon sentinel --setup-purge` sets that up explicitly, and only that:
+prompt. `aegis sentinel --setup-purge` sets that up explicitly, and only that:
 
 - It writes **`/etc/sudoers.d/macmon-purge`** containing exactly one line:
   `<your-user> ALL=(root) NOPASSWD: /usr/sbin/purge`
@@ -463,24 +490,23 @@ prompt. `macmon sentinel --setup-purge` sets that up explicitly, and only that:
   `--force-purge`, `--force-clean`, `--force-focus`, `--pause` / `--resume`.
 - **Branded notifications:** alerts pop up as **AegisForge** carrying its icon
   (not the generic Script Editor icon) via a tiny bundled notifier app. Try it
-  with `macmon sentinel --test-notify`.
+  with `aegis sentinel --test-notify`.
 
 ```bash
-macmon sentinel --install     # arm it (LaunchAgent, 60s sampler)
-macmon sentinel               # tactical snapshot with gauges + sparklines + FORGE panel
-macmon sentinel --watch       # live console
-macmon sentinel --status      # agent + config status
-macmon sentinel --log         # recent alerts
+aegis sentinel --install     # arm it (LaunchAgent, 60s sampler)
+aegis sentinel               # tactical snapshot with gauges + sparklines + FORGE panel
+aegis sentinel --watch       # live console
+aegis sentinel --status      # agent + config status
+aegis sentinel --log         # recent alerts
 ```
 
 ### AegisForge -- the proactive layer
 
-`macmon` is the engine; **AegisForge** ("fleet health, forged") is what you see:
+**AegisForge** ("fleet health, forged") is the product and what you see:
 the console theme and banner, the notification identity, and a set of
 *anticipatory* detectors (`macmon_core/aegis.py`) that read the metrics
 history so the sentinel alerts on **trajectory**, not just on the current
-value. Nothing here is a rename: the CLI, the package, the console script and
-the LaunchAgent labels are unchanged.
+value.
 
 All detectors are **on by default and notify-only**:
 
@@ -620,10 +646,10 @@ the default below.
 ## Architecture
 
 ```
-macmon.py                CLI router (typer, 30 commands)
+macmon.py                CLI router (typer, 30 commands; the `aegis` command, historical file name)
 macmon_core/
-  dashboard.py           Live TUI (rich) — 12 panels, keyboard shortcuts
-  sentinel.py            MACMON-SENTINEL: 60s sampler, alerts, auto-remediation
+  dashboard.py           Live TUI (rich) -- 12 panels, keyboard shortcuts
+  sentinel.py            Sentinel: 60s sampler, alerts, auto-remediation
   aegis.py               AegisForge layer: theme/brand, trend detectors, lineage-proven leak reaper
   app_menubar.py         AegisForge.app menu-bar face (rumps, optional): reads the sampler's rows, explicit actions only
   app_webui.py           AegisForge.app reads: loopback server (127.0.0.1, GET only) + the native window
@@ -663,7 +689,7 @@ assets/webui/            the app page (index.html, app.css = the design system, 
 Config lives at `~/.macmon/config.toml`:
 
 ```bash
-macmon config --edit
+aegis config --edit
 ```
 
 Key sections: `dashboard`, `thresholds`, `cleaner`, `privacy`, `gc`, `focus_mode`, `notifications`, `autopilot`.
@@ -671,10 +697,10 @@ Key sections: `dashboard`, `thresholds`, `cleaner`, `privacy`, `gc`, `focus_mode
 ## Development
 
 ```bash
-git clone https://github.com/SoCloseSociety/macmon
-cd macmon
+git clone https://github.com/SoCloseSociety/AegisForge
+cd AegisForge
 pip install -e ".[test]"   # runtime deps + pytest
-pytest -q                  # 519 hermetic tests: no network, no live subprocess
+pytest -q                  # 781 hermetic tests: no network, no live subprocess
 ```
 
 The suite is hermetic (tmp_path + monkeypatch only), so it runs anywhere. CI
@@ -689,11 +715,11 @@ MIT -- see [LICENSE](LICENSE). Free forever, for any use.
 
 ## FAQ
 
-**Is macmon really free?** Yes — MIT licensed, no account, no telemetry, no paid tier.
+**Is AegisForge really free?** Yes -- MIT licensed, no account, no telemetry, no paid tier.
 
 **Does it send my data anywhere?** No. Everything runs locally on your Mac. There is zero network telemetry.
 
-**Is it a CCleaner alternative for Mac?** Yes — it covers the same ground (caches, logs, temp, browser data, privacy traces) plus developer-specific cleanup (`node_modules`, venvs, Docker, Xcode) and safe Trash-first deletes.
+**Is it a CCleaner alternative for Mac?** Yes -- it covers the same ground (caches, logs, temp, browser data, privacy traces) plus developer-specific cleanup (`node_modules`, venvs, Docker, Xcode) and safe Trash-first deletes.
 
 **Will it delete something important?** Deletes move to the Trash by default and never silently escalate to permanent removal. Destructive categories are opt-in.
 
@@ -706,5 +732,5 @@ MIT -- see [LICENSE](LICENSE). Free forever, for any use.
 ---
 
 <p align="center">
-  <sub>Built with purpose by <strong><a href="https://soclose.co">SoClose</a></strong> — Digital Innovation Through Automation & AI</sub>
+  <sub>Built with purpose by <strong><a href="https://soclose.co">SoClose</a></strong> -- Digital Innovation Through Automation & AI</sub>
 </p>

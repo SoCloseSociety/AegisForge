@@ -83,7 +83,7 @@ def run_gc(
     permanent: bool = False,
     json_out: bool = False,
 ):
-    console.print(Panel("[bold]macmon gc[/] -- Dev Garbage Collector", border_style="yellow"))
+    console.print(Panel("[bold]aegis gc[/] -- Dev Garbage Collector", border_style="yellow"))
 
     cfg = load_config()
     gc_cfg = cfg.get("gc", {})

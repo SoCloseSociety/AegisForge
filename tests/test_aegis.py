@@ -950,7 +950,7 @@ class TestSampleCommand:
             raise AssertionError("the scheduler was touched with nothing runnable")
         monkeypatch.setattr(sentinel.subprocess, "run", boom)
         ok, note = sentinel._schedule_install()
-        assert ok is False and "macmon sentinel --resume" in note
+        assert ok is False and "aegis sentinel --resume" in note
 
     def test_find_macmon_probes_path_then_the_well_known_homes(self, tmp_path, monkeypatch):
         monkeypatch.setattr(sentinel.shutil, "which", lambda name: None)

@@ -38,7 +38,7 @@ public final class Updater {
     /** The "latest version" pointer, served from the repo (raw), pointing at a
      *  GitHub Release asset for the APK. */
     public static final String MANIFEST_URL =
-            "https://raw.githubusercontent.com/SoCloseSociety/macmon/main/apps/android/update/version.json";
+            "https://raw.githubusercontent.com/SoCloseSociety/AegisForge/main/apps/android/update/version.json";
 
     private static final int CONNECT_MS = 10000, READ_MS = 20000;
     private static final long MAX_APK = 80L * 1024 * 1024;

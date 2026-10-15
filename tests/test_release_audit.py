@@ -351,7 +351,7 @@ class TestVersion:
     def test_version_flag(self):
         r = CliRunner().invoke(macmon.app, ["--version"])
         assert r.exit_code == 0, r.output
-        assert r.output.strip() == f"macmon {macmon.__version__}"
+        assert r.output.strip() == f"aegis {macmon.__version__}"
 
     def test_version_matches_pyproject(self):
         import tomllib

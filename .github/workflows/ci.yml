@@ -53,6 +53,15 @@ jobs:
       - name: CLI loads and lists commands
         run: python macmon.py --help
 
+      # The packaged entry points: `aegis` (the command) and `macmon` (the
+      # deprecated alias, kept for at least one release after the rename).
+      - name: Entry points -- aegis + macmon alias
+        run: |
+          pip install .
+          aegis --help
+          aegis --version
+          macmon --version
+
       # Read-only commands that must work on every platform
       - name: Smoke -- ps (JSON)
         run: python -c "import json,subprocess,sys; out=subprocess.run([sys.executable,'macmon.py','ps','--json'],capture_output=True,text=True); assert out.returncode==0, out.stderr; d=json.loads(out.stdout); assert isinstance(d,list); print('ps OK:',len(d),'processes')"

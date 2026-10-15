@@ -6,7 +6,7 @@ import java.util.Locale;
 
 /**
  * The scoring, the verdict and the human strings. Pure Java (no Android), the
- * mobile analog of macmon's {@code health} command: each dimension gets a
+ * mobile analog of the aegis CLI's {@code health} command: each dimension gets a
  * level, the levels fold into a 0..100 score and an overall verdict, and the
  * worst dimension names itself. An unknown dimension is skipped, never scored
  * as a failure.

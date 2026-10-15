@@ -49,13 +49,23 @@ def run_autopilot(start: bool = False, stop: bool = False, status: bool = False,
         _show_status()
 
 
+# Launcher basenames of this CLI since the AegisForge rename. A pip / uv `aegis`
+# console script runs as [python, .../bin/aegis, ...]: no "macmon" anywhere in
+# its cmdline, so without this a live daemon looked stale (double start, and
+# `auto --stop` could not find it).
+_CLI_LAUNCHER_NAMES = frozenset({"aegis", "aegis.exe", "aegis-script.py"})
+
+
 def _is_macmon_process(pid: int) -> bool:
-    """Return True if the PID belongs to a running macmon process."""
+    """Return True if the PID belongs to a running aegis (formerly macmon) CLI process."""
     try:
         cmdline = psutil.Process(pid).cmdline()
-        return any("macmon" in part for part in cmdline)
     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
         return False
+    # Split on both separators: a Windows cmdline is judged the same on any host.
+    return any("macmon" in part
+               or part.replace("\\", "/").rsplit("/", 1)[-1].lower() in _CLI_LAUNCHER_NAMES
+               for part in cmdline)
 
 
 def _read_daemon_pid():
@@ -203,7 +213,7 @@ def _apply_rules(db, cfg, mem, disk_free_gb, zombies, orphan_count):
             _autopilot_log("RAM Critical: running purge")
             if _daemon_purge(db, cfg):
                 _record_fire(db, "RAM Critical", "purge", 5)
-                send_notification("macmon", "RAM critical! Ran purge.", cfg.get("notifications", {}).get("style", "osascript"))
+                send_notification("AegisForge", "RAM critical! Ran purge.", cfg.get("notifications", {}).get("style", "osascript"))
             else:
                 _record_fire(db, "RAM Critical", "purge failed", 5)
 
@@ -219,22 +229,22 @@ def _apply_rules(db, cfg, mem, disk_free_gb, zombies, orphan_count):
                             os.kill(ppid, signal.SIGCHLD)
                 except (psutil.NoSuchProcess, psutil.AccessDenied, ProcessLookupError, PermissionError):
                     pass
-            send_notification("macmon", f"{zombies} zombies found, run `macmon sweep`", cfg.get("notifications", {}).get("style", "osascript"))
+            send_notification("AegisForge", f"{zombies} zombies found, run `aegis sweep`", cfg.get("notifications", {}).get("style", "osascript"))
             _record_fire(db, "Kill Zombies", f"found {zombies}, notified", 2)
 
-    # Rule: Kill Orphans -- detection only, suggest `macmon sweep`
+    # Rule: Kill Orphans -- detection only, suggest `aegis sweep`
     if orphan_count > 3:
         if _can_fire(db, "Kill Orphans", 10):
             _autopilot_log(f"Detected {orphan_count} orphans")
-            send_notification("macmon", f"{orphan_count} orphans detected, run `macmon sweep`", cfg.get("notifications", {}).get("style", "osascript"))
+            send_notification("AegisForge", f"{orphan_count} orphans detected, run `aegis sweep`", cfg.get("notifications", {}).get("style", "osascript"))
             _record_fire(db, "Kill Orphans", f"detected {orphan_count}", 10)
 
     # Rule: Low Disk
     if disk_free_gb < 10:
         if _can_fire(db, "Low Disk", 60):
-            msg = f"Low disk! {disk_free_gb:.1f}GB free. Run `macmon gc --all`"
+            msg = f"Low disk! {disk_free_gb:.1f}GB free. Run `aegis gc --all`"
             _autopilot_log(msg)
-            send_notification("macmon", msg, cfg.get("notifications", {}).get("style", "osascript"))
+            send_notification("AegisForge", msg, cfg.get("notifications", {}).get("style", "osascript"))
             _record_fire(db, "Low Disk", msg, 60)
 
     # Rule: CPU Runaway
@@ -264,14 +274,14 @@ def _apply_rules(db, cfg, mem, disk_free_gb, zombies, orphan_count):
     if browser_ram > 4 * 1024**3:  # 4GB
         if _can_fire(db, "Browser RAM Hog", 30):
             msg = f"Browser using {format_size(browser_ram)} RAM -- close some tabs"
-            send_notification("macmon", msg, cfg.get("notifications", {}).get("style", "osascript"))
+            send_notification("AegisForge", msg, cfg.get("notifications", {}).get("style", "osascript"))
             _record_fire(db, "Browser RAM Hog", msg, 30)
 
     # Rule: Weekly clean reminder
     last_clean = _get_hours_since(db, "clean")
     if last_clean is None or last_clean > 168:
         if _can_fire(db, "Weekly Clean Reminder", 1440):  # Once per day max
-            send_notification("macmon", "7+ days since last clean. Run `macmon clean --all`", cfg.get("notifications", {}).get("style", "osascript"))
+            send_notification("AegisForge", "7+ days since last clean. Run `aegis clean --all`", cfg.get("notifications", {}).get("style", "osascript"))
             _record_fire(db, "Weekly Clean Reminder", "notified", 1440)
 
     # ── Thermal Rules ───────────────────────────────────────────────────
@@ -306,7 +316,7 @@ def _evaluate_thermal_rules(db, cfg: dict):
         if _can_fire(db, "Thermal Critical", 3):
             _autopilot_log(f"THERMAL CRITICAL: {real_temp:.0f}°C -- renicing top CPU hogs")
             _renice_top_cpu_hogs(priority=15, max_procs=5)
-            send_notification("macmon THERMAL", f"CPU at {real_temp:.0f}°C! Throttling heavy processes.", notify_style)
+            send_notification("AegisForge THERMAL", f"CPU at {real_temp:.0f}°C! Throttling heavy processes.", notify_style)
             _record_fire(db, "Thermal Critical", f"{real_temp:.0f}°C reniced top 5", 3)
 
     # Rule: Thermal Warning (>82°C) -- renice top hog gently
@@ -389,7 +399,7 @@ def _evaluate_security_rules(db, cfg: dict):
                 if _can_fire(db, f"Suspicious Port {conn.raddr.port}", 10):
                     msg = f"Suspicious connection to port {conn.raddr.port} ({port_desc}) -> {conn.raddr.ip}"
                     _autopilot_log(msg)
-                    send_notification("macmon SECURITY", msg, notify_style)
+                    send_notification("AegisForge SECURITY", msg, notify_style)
                     _record_fire(db, f"Suspicious Port {conn.raddr.port}", msg, 10)
     except (psutil.AccessDenied, PermissionError, ImportError):
         pass
@@ -405,7 +415,7 @@ def _evaluate_security_rules(db, cfg: dict):
                         if _can_fire(db, f"Remote Tool {p.info['name']}", 60):
                             msg = f"Remote access tool detected: {p.info['name']} (PID {p.info['pid']})"
                             _autopilot_log(msg)
-                            send_notification("macmon SECURITY", msg, notify_style)
+                            send_notification("AegisForge SECURITY", msg, notify_style)
                             _record_fire(db, f"Remote Tool {p.info['name']}", msg, 60)
                         break
             except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -424,7 +434,7 @@ def _evaluate_security_rules(db, cfg: dict):
                     if _can_fire(db, f"Crypto Miner {p.info['pid']}", 5):
                         msg = f"Possible crypto miner: {p.info['name']} (PID {p.info['pid']}, CPU {cpu:.0f}%)"
                         _autopilot_log(msg)
-                        send_notification("macmon SECURITY", msg, notify_style)
+                        send_notification("AegisForge SECURITY", msg, notify_style)
                         _record_fire(db, f"Crypto Miner {p.info['pid']}", msg, 5)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
@@ -437,7 +447,7 @@ def _evaluate_security_rules(db, cfg: dict):
                 if _can_fire(db, f"TmpExec {p.info['pid']}", 30):
                     msg = f"Process running from temp dir: {p.info['name']} ({exe})"
                     _autopilot_log(msg)
-                    send_notification("macmon SECURITY", msg, notify_style)
+                    send_notification("AegisForge SECURITY", msg, notify_style)
                     _record_fire(db, f"TmpExec {p.info['pid']}", msg, 30)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
@@ -480,7 +490,7 @@ def _daemon_purge(db, cfg: dict) -> bool:
     _autopilot_log(f"purge failed (rc={rc}): {err.strip() or 'passwordless sudo required'}")
     if _can_fire(db, "Purge Sudo Warning", 1440):
         style = cfg.get("notifications", {}).get("style", "osascript")
-        send_notification("macmon", "Autopilot cannot run `purge` -- passwordless sudo required.", style)
+        send_notification("AegisForge", "Autopilot cannot run `purge` -- passwordless sudo required.", style)
         _record_fire(db, "Purge Sudo Warning", "notified", 1440)
     return False
 
@@ -603,7 +613,7 @@ def enter_focus():
     kill_list = cfg.get("focus_mode", {}).get("kill_on_focus", [])
     essential = cfg.get("focus_mode", {}).get("essential_apps", [])
 
-    console.print(Panel("[bold]macmon focus[/] -- Entering Focus Mode", border_style="yellow"))
+    console.print(Panel("[bold]aegis focus[/] -- Entering Focus Mode", border_style="yellow"))
 
     killed_apps = []
 
@@ -663,7 +673,7 @@ def enter_focus():
         pass
 
     console.print(f"\n[green bold]Focus mode active. Quit {len(set(killed_apps))} apps.[/]")
-    console.print("[dim]Run `macmon restore` to reopen them.[/]")
+    console.print("[dim]Run `aegis restore` to reopen them.[/]")
     log_action("focus", f"killed {len(set(killed_apps))} apps")
 
     # Do Not Disturb
@@ -686,7 +696,7 @@ def restore_focus():
         console.print("[dim]No apps to restore.[/]")
         return
 
-    console.print(Panel("[bold]macmon restore[/] -- Restoring Apps", border_style="green"))
+    console.print(Panel("[bold]aegis restore[/] -- Restoring Apps", border_style="green"))
 
     for app in apps:
         run_cmd(["open", "-a", app], timeout=5)

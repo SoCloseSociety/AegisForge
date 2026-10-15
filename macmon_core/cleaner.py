@@ -262,7 +262,7 @@ def run_cleaner(
         return
 
     # Full system clean
-    console.print(Panel("[bold]macmon clean[/] -- System Cleaner", border_style="cyan"))
+    console.print(Panel("[bold]aegis clean[/] -- System Cleaner", border_style="cyan"))
 
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console) as progress:
         task = progress.add_task("Scanning...", total=None)
@@ -310,7 +310,7 @@ def _scan_all(progress=None) -> list[dict]:
     """The full-clean preview: system junk + browser caches + app caches +
     user caches, each ``{"name", "size", "count", "paths"}``. Nothing is
     touched. ``progress(msg)`` narrates each phase (the CLI spinner, the app's
-    funnel). Shared by ``macmon clean`` and the AegisForge app."""
+    funnel). Shared by ``aegis clean`` and the AegisForge app."""
     say = progress or (lambda m: None)
     results = []
     say("Scanning system junk...")

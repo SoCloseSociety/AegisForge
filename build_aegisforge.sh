@@ -3,7 +3,7 @@
 # Mirrors the fleet's build_sentinel.sh pattern: --windowed + --icon, a normal
 # windowed app (Dock icon + native pywebview dashboard window; LSUIElement is
 # stripped in step 4), ad-hoc codesign. NOT the CLI: the public
-# `macmon` CLI stays a plain console tool with no rumps/pyobjc dependency.
+# `aegis` CLI stays a plain console tool with no rumps/pyobjc dependency.
 #
 # Usage:
 #   ./build_aegisforge.sh            # build dist/AegisForge.app

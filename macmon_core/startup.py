@@ -199,7 +199,7 @@ def _get_all_items() -> list[dict]:
 def _list_all():
     items = _get_all_items()
 
-    console.print(Panel("[bold]macmon startup[/] -- Startup Items Manager", border_style="cyan"))
+    console.print(Panel("[bold]aegis startup[/] -- Startup Items Manager", border_style="cyan"))
 
     for category in AGENT_DIRS.keys():
         cat_items = [i for i in items if i["category"] == category]
@@ -281,7 +281,7 @@ def _show_broken():
         table.add_row(item["label"], item["program"], item["category"])
 
     console.print(table)
-    console.print("[dim]Use `macmon startup --delete <label>` to remove broken items.[/]")
+    console.print("[dim]Use `aegis startup --delete <label>` to remove broken items.[/]")
 
 
 def _audit_items():

@@ -6,7 +6,7 @@ which serves the app page (``assets/webui/``) and its READ-only JSON:
 
   /api/status     vitals + FORGE findings + alerts (the 60s sampler's rows)
   /api/history    the last n samples (sparklines)
-  /api/health     macmon health: score + checks
+  /api/health     aegis health: score + checks
   /api/processes  the process table (+ a ``protected`` flag per row)
   /api/security   the security scan: score + findings
   /api/docker     overview + containers + images + volumes

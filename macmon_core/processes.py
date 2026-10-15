@@ -31,7 +31,7 @@ from .utils import (
 # ── Process Listing ──────────────────────────────────────────────────────
 
 def collect_processes(filter_cat: str = None, sort_by: str = "cpu") -> list[dict]:
-    """The process table as plain dicts (the data behind ``macmon ps`` and the
+    """The process table as plain dicts (the data behind ``aegis ps`` and the
     AegisForge app's Processes view). Two passes: the first primes the
     per-process CPU counters (the first cpu_percent always reads 0.0), the
     second after a short delay reads real values."""
@@ -348,7 +348,7 @@ def purge_ram():
 # ── Sweep: Zombie/Orphan/Port/Lock killer ────────────────────────────────
 
 def run_sweep(zombies_only: bool = False, orphans_only: bool = False, force_yes: bool = False):
-    console.print(Panel("[bold]macmon sweep[/] -- Dead Process Hunter", border_style="red"))
+    console.print(Panel("[bold]aegis sweep[/] -- Dead Process Hunter", border_style="red"))
 
     results = {"zombies": 0, "orphans": 0, "ports": 0, "locks": 0}
 

@@ -246,7 +246,7 @@ def _security_checks(progress=None) -> tuple[int, list[dict]]:
 
 
 def _full_security_scan(json_out: bool = False):
-    console.print(Panel("[bold red]macmon security[/] -- Full Security Scan", border_style="red"))
+    console.print(Panel("[bold red]aegis security[/] -- Full Security Scan", border_style="red"))
     score, findings = _security_checks(lambda m: console.print(f"[cyan]{m}[/]"))
 
     # Display results
@@ -628,7 +628,7 @@ def _check_ssh_security() -> dict:
 # ── Actions ──────────────────────────────────────────────────────────────
 
 def _scan_connections(json_out: bool = False):
-    console.print(Panel("[bold]macmon security --connections[/] -- Live Connection Audit", border_style="red"))
+    console.print(Panel("[bold]aegis security --connections[/] -- Live Connection Audit", border_style="red"))
 
     out, _, rc = run_cmd(["lsof", "+c", "0", "-i", "-n", "-P"], timeout=15)
     if rc != 0:
@@ -677,7 +677,7 @@ def _scan_connections(json_out: bool = False):
     high_risk = [c for c in connections if c["risk"] == "high"]
     if high_risk:
         console.print(f"\n[red bold]{len(high_risk)} HIGH RISK connection(s) detected![/]")
-        console.print("[dim]Use `macmon security --block-ip <IP>` to block or `macmon kill <PID>` to stop.[/]")
+        console.print("[dim]Use `aegis security --block-ip <IP>` to block or `aegis kill <PID>` to stop.[/]")
 
     if json_out:
         console.print_json(json.dumps(connections, default=str))
@@ -693,7 +693,7 @@ def _binary_untrusted(path: Path) -> bool:
 
 
 def _scan_malware(json_out: bool = False):
-    console.print(Panel("[bold]macmon security --malware[/] -- Malware Scan", border_style="red"))
+    console.print(Panel("[bold]aegis security --malware[/] -- Malware Scan", border_style="red"))
 
     findings = []
 
@@ -782,7 +782,7 @@ def _scan_malware(json_out: bool = False):
 
 
 def _scan_remote_access(json_out: bool = False):
-    console.print(Panel("[bold]macmon security --remote[/] -- Remote Access Audit", border_style="yellow"))
+    console.print(Panel("[bold]aegis security --remote[/] -- Remote Access Audit", border_style="yellow"))
 
     results = []
 
@@ -830,7 +830,7 @@ def _scan_remote_access(json_out: bool = False):
 
 
 def _show_firewall():
-    console.print(Panel("[bold]macmon security --firewall[/] -- Firewall Status", border_style="cyan"))
+    console.print(Panel("[bold]aegis security --firewall[/] -- Firewall Status", border_style="cyan"))
 
     fw = _check_firewall()
     console.print(f"  Status: {fw['detail']}")
@@ -1038,7 +1038,7 @@ def _quarantine_one(p, force_yes: bool = False):
 
 
 def _show_security_rules():
-    console.print(Panel("[bold]macmon security --rules[/] -- Auto Security Rules", border_style="cyan"))
+    console.print(Panel("[bold]aegis security --rules[/] -- Auto Security Rules", border_style="cyan"))
 
     rules = [
         {"rule": "Block suspicious ports", "ports": ", ".join(f"{p}" for p in list(SUSPICIOUS_PORTS.keys())[:8]), "action": "Alert + log", "status": "Active"},

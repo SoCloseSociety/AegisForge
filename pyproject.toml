@@ -3,9 +3,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-# Distribution name on PyPI: "macmon" is taken by an unrelated project, so the
-# package publishes under the product brand. The CLI command stays `macmon`
-# (see [project.scripts]) and the import package stays `macmon_core`.
+# Product, distribution and repo name: AegisForge (formerly macmon). The CLI is
+# `aegis`; `macmon` stays as a deprecated alias for at least one release (see
+# [project.scripts]). The import package stays `macmon_core` and the entry
+# module stays `macmon.py` on purpose: zero import breakage.
 name = "aegisforge"
 version = "1.6.0"
 description = "Mac Developer Monitor + System Cleaner CLI -- live dashboard, dev garbage collector, security audit, 100% local"
@@ -48,11 +49,13 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://soclose.co"
-Repository = "https://github.com/SoCloseSociety/macmon"
-Issues = "https://github.com/SoCloseSociety/macmon/issues"
+Repository = "https://github.com/SoCloseSociety/AegisForge"
+Issues = "https://github.com/SoCloseSociety/AegisForge/issues"
 
 [project.scripts]
-macmon = "macmon:app"
+aegis = "macmon:app"
+# Deprecated alias (renamed 2026-10): same CLI, plus a one-line notice on stderr.
+macmon = "macmon:macmon_alias"
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]

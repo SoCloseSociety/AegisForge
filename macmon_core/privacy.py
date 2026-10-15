@@ -25,7 +25,7 @@ def run_privacy(scan: bool = False, clean: bool = False, full: bool = False, for
     if msg:
         console.print(f"[yellow]{msg}[/]")
         return
-    console.print(Panel("[bold]macmon privacy[/] -- Privacy Traces Wiper", border_style="red"))
+    console.print(Panel("[bold]aegis privacy[/] -- Privacy Traces Wiper", border_style="red"))
 
     traces = _scan_all_traces()
 

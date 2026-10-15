@@ -309,7 +309,7 @@ class TestFrozenActions:
         monkeypatch.setattr(processes, "purge_ram",
                             lambda: mb.console.print("[red]Purge failed: sudo needs a password[/]"))
         mb._run_action(["purge"])
-        assert frozen == [("AegisForge", "macmon purge: Purge failed: sudo needs a password")]
+        assert frozen == [("AegisForge", "aegis purge: Purge failed: sudo needs a password")]
 
     def test_a_failing_action_is_reported_not_swallowed(self, frozen, monkeypatch):
         def boom():
@@ -370,7 +370,7 @@ class TestDevActions:
         monkeypatch.setattr(mb.subprocess, "run", lambda cmd, **kw: types.SimpleNamespace(
             returncode=1, stdout="RAM before: 1 GB\nPurge failed: sudo needs a password\n", stderr=""))
         mb._run_action(["purge"])
-        assert notes == [("AegisForge: macmon purge failed", "Purge failed: sudo needs a password")]
+        assert notes == [("AegisForge: aegis purge failed", "Purge failed: sudo needs a password")]
 
 
 class TestOpenDashboard:

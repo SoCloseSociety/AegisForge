@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""macmon - Mac Developer Monitor + System Cleaner CLI."""
+"""AegisForge (formerly macmon) - Mac Developer Monitor + System Cleaner CLI.
 
+The command is `aegis`; `macmon` stays as a deprecated alias. This module keeps
+its historical name (macmon.py) on purpose so no import or path breaks.
+"""
+
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -9,7 +14,7 @@ from typing import Optional
 # an older interpreter dies on an obscure ImportError deep in config loading.
 if sys.version_info < (3, 11):
     sys.exit(
-        f"macmon requires Python 3.11+ (running {sys.version_info.major}.{sys.version_info.minor}). "
+        f"AegisForge (aegis) requires Python 3.11+ (running {sys.version_info.major}.{sys.version_info.minor}). "
         "Create a venv with a newer interpreter: python3.11 -m venv .venv"
     )
 
@@ -22,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 __version__ = "1.6.0"   # keep in sync with pyproject.toml [project].version
 
 app = typer.Typer(
-    name="macmon",
+    name="aegis",
     help="Mac Developer Monitor + System Cleaner -- CCleaner Pro level, 100% local.",
     no_args_is_help=False,
     rich_markup_mode="rich",
@@ -32,7 +37,7 @@ console = Console()
 
 def _version_callback(value: bool):
     if value:
-        typer.echo(f"macmon {__version__}")
+        typer.echo(f"aegis {__version__}")
         raise typer.Exit()
 
 
@@ -106,14 +111,14 @@ def resume(target: str = typer.Argument(..., help="Process name or PID")):
     resume_process(target)
 
 
-# ignore_unknown_options: a negative nice value (`macmon nice node -5`) must
+# ignore_unknown_options: a negative nice value (`aegis nice node -5`) must
 # reach the int argument instead of being rejected as an unknown "-5" option.
 @app.command(context_settings={"ignore_unknown_options": True})
 def nice(
     target: str = typer.Argument(..., help="Process name or PID"),
     value: int = typer.Argument(..., help="Nice value (-20 to 19)"),
 ):
-    """Renice a process (negative values need root: `sudo macmon nice node -5`)."""
+    """Renice a process (negative values need root: `sudo aegis nice node -5`)."""
     from macmon_core.processes import renice_process
     renice_process(target, value)
 
@@ -489,7 +494,7 @@ def sentinel(
     force_purge: bool = typer.Option(False, "--force-purge", help="Free inactive RAM now"),
     force_clean: bool = typer.Option(False, "--force-clean", help="Scan then clean caches/temp"),
     force_focus: bool = typer.Option(False, "--force-focus", help="Quit non-essentials + purge"),
-    test_notify: bool = typer.Option(False, "--test-notify", help="Send a test notification with the macmon icon"),
+    test_notify: bool = typer.Option(False, "--test-notify", help="Send a test notification with the AegisForge icon"),
     enable_auto: bool = typer.Option(False, "--enable-auto", help="Enable auto-remediation on memory pressure"),
     disable_auto: bool = typer.Option(False, "--disable-auto", help="Disable auto-remediation (notify-only)"),
     aggressive: bool = typer.Option(False, "--aggressive", help="With --enable-auto: also auto-close idle AI sessions"),
@@ -499,7 +504,7 @@ def sentinel(
     reap: bool = typer.Option(False, "--reap", help="With --enable-auto: also auto-reap PROVEN leaked orphans (PID 1 + parent watched dying)"),
     reap_orphans: bool = typer.Option(False, "--reap-orphans", help="List proven leaked orphans and reap them now (asks first)"),
 ):
-    """AegisForge sentinel: proactive monitor + tactical console (engine: macmon)."""
+    """AegisForge sentinel: proactive monitor + tactical console."""
     from macmon_core.sentinel import run_sentinel
     run_sentinel(
         sample=sample, install_flag=install, uninstall_flag=uninstall,
@@ -511,5 +516,39 @@ def sentinel(
     )
 
 
+# ── Deprecated `macmon` alias ────────────────────────────────────────────
+# Renamed to AegisForge / `aegis` (2026-10). `macmon` keeps working for at least
+# one release: same commands, same output, plus ONE line on stderr. install.sh's
+# `macmon` wrapper runs this file with AEGISFORGE_INVOKED_AS=macmon; the pip /
+# uv entry point calls macmon_alias() directly.
+ALIAS = "macmon"
+ALIAS_ENV = "AEGISFORGE_INVOKED_AS"
+DEPRECATION_NOTICE = ("macmon is now 'aegis' (AegisForge): the 'macmon' alias still works "
+                      "but will be removed in a future release.")
+
+
+def _deprecation_notice() -> None:
+    """Print the rename notice on stderr, interactive terminals only: a
+    scheduled `macmon sentinel --sample` (launchd / cron / schtasks, every 60s)
+    must not mail or log it every minute, and stdout (--json) is never touched."""
+    try:
+        interactive = sys.stderr.isatty()
+    except (AttributeError, ValueError):
+        interactive = False
+    if interactive:
+        print(DEPRECATION_NOTICE, file=sys.stderr)
+
+
+def macmon_alias():
+    """Console entry point of the deprecated `macmon` command."""
+    # Not inherited by the subcommands the CLI spawns (a child is no alias call).
+    os.environ.pop(ALIAS_ENV, None)
+    _deprecation_notice()
+    app(prog_name=ALIAS)
+
+
 if __name__ == "__main__":
-    app()
+    if os.environ.get(ALIAS_ENV) == ALIAS:
+        macmon_alias()
+    else:
+        app(prog_name="aegis")

@@ -301,7 +301,7 @@ async function loadHealth(force) {
     const d = await get("/api/health"); box.dataset.at = String(Date.now());
     const checks = [...(d.checks || [])].sort((a, b) => ({ fail: 0, warn: 1, pass: 2 }[a.status] ?? 3) - ({ fail: 0, warn: 1, pass: 2 }[b.status] ?? 3));
     show(box, ring(d.score), h("div", { class: "checks" }, checks.slice(0, 9).map((c) => h("div", { class: "check" }, h("span", { class: "st st-" + c.status }, c.status), h("span", { class: "nm" }, c.name), h("span", { class: "dt", title: c.detail }, c.detail))),
-      checks.length > 9 ? h("div", { class: "muted", style: { fontSize: "11px" } }, `+${checks.length - 9} more (macmon health)`) : null));
+      checks.length > 9 ? h("div", { class: "muted", style: { fontSize: "11px" } }, `+${checks.length - 9} more (aegis health)`) : null));
   } catch (e) { show(box, errBox("health check failed: " + e.message, () => loadHealth(true))); }
 }
 $("health-refresh").addEventListener("click", () => loadHealth(true));
@@ -364,7 +364,7 @@ async function signalFunnel(verb, p) {
   setTimeout(loadProcs, 900);
 }
 $("ps-purge").addEventListener("click", async () => {
-  const { ok } = await confirmModal({ title: "Purge inactive RAM?", ok: "Purge", danger: false, body: [h("p", null, "Runs ", h("code", null, "sudo -n purge"), ". Non-destructive: it flushes inactive memory and the disk cache (apps may feel cold for a moment). It never prompts -- it fails fast unless ", h("code", null, "macmon sentinel --setup-purge"), " installed the sudoers rule.")] });
+  const { ok } = await confirmModal({ title: "Purge inactive RAM?", ok: "Purge", danger: false, body: [h("p", null, "Runs ", h("code", null, "sudo -n purge"), ". Non-destructive: it flushes inactive memory and the disk cache (apps may feel cold for a moment). It never prompts -- it fails fast unless ", h("code", null, "aegis sentinel --setup-purge"), " installed the sudoers rule.")] });
   if (!ok) return;
   try { const r = await api("purge_ram"); toast(r.detail || "done", r.ok ? "ok" : "bad", 6000); } catch (e) { toast(e.message, "bad"); }
 });
@@ -510,7 +510,7 @@ $("dk-tabs").addEventListener("keydown", (e) => {
 $("dk-refresh").addEventListener("click", loadDocker);
 $("dk-prune").addEventListener("click", async () => {
   const n = (dk.data && dk.data.overview && dk.data.overview.dangling_images) || 0;
-  const { ok } = await confirmModal({ title: `Prune ${n} dangling image${n === 1 ? "" : "s"}?`, ok: "Prune", body: [h("p", null, "Runs ", h("code", null, "docker image prune -f"), " -- dangling (untagged, unreferenced) images only."), infoLine("Never -a, never containers, volumes, build cache or networks. Those stay in macmon docker --prune, where you confirm them in the terminal.")] });
+  const { ok } = await confirmModal({ title: `Prune ${n} dangling image${n === 1 ? "" : "s"}?`, ok: "Prune", body: [h("p", null, "Runs ", h("code", null, "docker image prune -f"), " -- dangling (untagged, unreferenced) images only."), infoLine("Never -a, never containers, volumes, build cache or networks. Those stay in aegis docker --prune, where you confirm them in the terminal.")] });
   if (!ok) return;
   $("dk-prune").disabled = true; toast("pruning...", "warn", 1500);
   try { const r = await api("docker_prune_dangling"); toast(r.detail || (r.ok ? "pruned" : "refused"), r.ok ? "ok" : "bad", 6000); } catch (e) { toast(e.message, "bad"); }
@@ -566,7 +566,7 @@ function renderSentinel() {
   const st = clear($("sn-status"));
   st.appendChild(h("div", { class: "status-line" }, h("span", { class: "lamp " + (d.sampler_active ? "on" : "off"), "aria-hidden": "true" }), h("b", null, d.sampler_active ? "ACTIVE" : "STOPPED"), h("span", { class: "muted" }, d.sampler_active ? "sampling every 60 s" : "paused -- no new samples, no alerts"), h("span", { class: "grow" }),
     d.sampler_active ? h("button", { class: "btn btn-warn btn-sm", type: "button", disabled: !bridge.ready, onclick: () => sentinelToggle("pause") }, ico("pause"), "Pause") : h("button", { class: "btn btn-primary btn-sm", type: "button", disabled: !bridge.ready, onclick: () => sentinelToggle("resume") }, ico("play"), "Resume")));
-  st.appendChild(kvRows([["weekly health agent", d.weekly_active == null ? "macOS only" : d.weekly_active ? "ACTIVE" : "STOPPED"], ["samples on disk", d.samples], ["metrics", d.metrics_path], ["passwordless purge", d.is_mac ? (d.purge_ready ? "configured" : "not configured (macmon sentinel --setup-purge)") : "macOS only"]]));
+  st.appendChild(kvRows([["weekly health agent", d.weekly_active == null ? "macOS only" : d.weekly_active ? "ACTIVE" : "STOPPED"], ["samples on disk", d.samples], ["metrics", d.metrics_path], ["passwordless purge", d.is_mac ? (d.purge_ready ? "configured" : "not configured (aegis sentinel --setup-purge)") : "macOS only"]]));
   const tr = clear($("sn-trends")), t = d.trends || {};
   if (!t.points) { tr.appendChild(emptyState("clock", "No history yet", "The sampler needs a few minutes of samples before a slope means anything.")); $("sn-trend-note").textContent = ""; }
   else {
@@ -586,7 +586,7 @@ function renderSentinel() {
     const sw = h("button", { class: "switch " + (on ? "is-on" : ""), type: "button", role: "switch", "aria-checked": on ? "true" : "false", "aria-label": label, disabled: !bridge.ready, onclick: () => autoToggle(key, !on, sw) });
     au.appendChild(h("div", { class: "switch-row" }, sw, h("div", { class: "sw-text" }, h("div", { class: "sw-lbl" }, label), h("div", { class: "sw-key" }, key)), h("span", { class: "chip " + (on ? "chip-ember" : "chip-dim") }, on ? "ON" : "OFF")));
   }
-  if (!bridge.ready) au.appendChild(roBanner("Read-only tab: toggles work inside the native AegisForge window (or: macmon sentinel --enable-auto / --disable-auto)."));
+  if (!bridge.ready) au.appendChild(roBanner("Read-only tab: toggles work inside the native AegisForge window (or: aegis sentinel --enable-auto / --disable-auto)."));
   show($("sn-thresholds"), Object.entries(d.thresholds || {}).map(([k, v]) => h("div", null, h("span", null, k), h("span", null, v == null ? "--" : String(v)))));
   $("sn-conf-path").textContent = d.conf_path ? `${d.conf_path} -- read-only here` : "";
 }
@@ -602,18 +602,18 @@ async function sentinelToggle(verb) {
   setTimeout(loadSentinel, 600);
 }
 const AUTO_WARN = {
-  auto_purge: "Level 1, non-destructive: on memory pressure the sentinel runs sudo -n purge (needs the passwordless rule from macmon sentinel --setup-purge; skipped otherwise).",
+  auto_purge: "Level 1, non-destructive: on memory pressure the sentinel runs sudo -n purge (needs the passwordless rule from aegis sentinel --setup-purge; skipped otherwise).",
   auto_unload_ollama: "Level 1, non-destructive: idle ollama models are unloaded when RAM is critical. They reload on demand.",
   auto_trim_fleet: "Level 2: when RAM is critical the sentinel CLOSES idle AI sessions (keeps fleet_keep, resumable). Only sessions idle for idle_samples in a row.",
   auto_reap_orphans: "Level 2: SIGTERMs dev processes under PID 1 whose parent the sentinel WATCHED die, idle 5 min, with no live or listening socket. Never a process with a live parent, never one in service.",
 };
 async function autoToggle(key, on, sw) {
   if (on) {
-    const { ok } = await confirmModal({ title: `Enable ${key}?`, ok: "Enable", ack: "I opt in: the sentinel may act on its own under these rules.", body: [h("div", { class: "warn" }, AUTO_WARN[key] || key), infoLine("Writes sentinel.conf. Turn it off any time here or with macmon sentinel --disable-auto.")] });
+    const { ok } = await confirmModal({ title: `Enable ${key}?`, ok: "Enable", ack: "I opt in: the sentinel may act on its own under these rules.", body: [h("div", { class: "warn" }, AUTO_WARN[key] || key), infoLine("Writes sentinel.conf. Turn it off any time here or with aegis sentinel --disable-auto.")] });
     if (!ok) return;
   }
   sw.classList.add("is-busy"); sw.disabled = true;
-  try { const r = await api("sentinel_set_auto", key, on); if (!r.ok) throw new Error(r.detail || "refused"); toast(`${key}: ${r.on ? "ON" : "OFF"}`, r.on ? "ember" : "ok"); if (r.on && key === "auto_purge" && r.purge_ready === false) toast("auto_purge is ON but passwordless purge is not configured: run macmon sentinel --setup-purge (until then it is skipped, notifications still fire).", "warn", 9000); }
+  try { const r = await api("sentinel_set_auto", key, on); if (!r.ok) throw new Error(r.detail || "refused"); toast(`${key}: ${r.on ? "ON" : "OFF"}`, r.on ? "ember" : "ok"); if (r.on && key === "auto_purge" && r.purge_ready === false) toast("auto_purge is ON but passwordless purge is not configured: run aegis sentinel --setup-purge (until then it is skipped, notifications still fire).", "warn", 9000); }
   catch (e) { toast(e.message, "bad"); }
   loadSentinel();
 }

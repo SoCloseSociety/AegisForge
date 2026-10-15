@@ -6,11 +6,11 @@ theme, and the proactive layer in `aegis.py` that turns the sampler from a
 threshold alarm into an anticipatory one (trend/slope over the history).
 
 Design goals: precise, surgical, near-zero cost.
-  - Collector: a single-shot sampler (macmon sentinel --sample) fired every 60s
+  - Collector: a single-shot sampler (aegis sentinel --sample) fired every 60s
     by a LaunchAgent. It measures in ~0.5s, appends one compact JSON line, fires
     threshold alerts (macOS notification + optional gentle remediation), exits.
     No resident process between samples => ~0.1% average CPU.
-  - Console: a dense military-style readout (macmon sentinel) that reads the
+  - Console: a dense military-style readout (aegis sentinel) that reads the
     collected metrics. Zero cost when not open.
   - Manual override: force-purge / force-clean / force-focus / pause / resume.
 
@@ -601,14 +601,14 @@ def run_sample():
         ("net", rtt is not None and rtt > cfg["rtt_ms"], f"{ALERT_TITLE}: network saturated",
          f"Latency {rtt or 0:.0f} ms -- a transfer is monopolizing the link.", 1800),
         ("disk", du.free / 1e9 < cfg["disk_free_gb"], f"{ALERT_TITLE}: low disk",
-         f"{du.free/1e9:.0f} GB free -- run 'macmon sentinel --force-clean'.", 3600),
+         f"{du.free/1e9:.0f} GB free -- run 'aegis sentinel --force-clean'.", 3600),
         ("fleet", fleet_total > cfg["ai_fleet"], f"{ALERT_TITLE}: AI fleet",
          f"{fleet_total} AI sessions open (claude+codex).", 7200),
         # Hidden hogs: an idle ollama model or a virtual machine can silently
         # hold multiple GB. Notify only -- unloading is handled by remediation.
         ("ollama", oll["gb"] >= cfg["ollama_gb"] and not oll["busy"], f"{ALERT_TITLE}: ollama in memory",
          f"{oll['gb']:.1f} GB of ollama models loaded and idle ({', '.join(oll['models'][:2])}). "
-         f"Unload with: macmon sentinel --unload-ollama", 3600),
+         f"Unload with: aegis sentinel --unload-ollama", 3600),
         ("vm", vmst["gb"] >= cfg["vm_gb"], f"{ALERT_TITLE}: virtual machine",
          f"A virtual machine{vm_owner} is holding {vmst['gb']:.1f} GB. Stop it if you are not using it.", 7200),
     ]
@@ -847,7 +847,7 @@ def _snapshot_panel():
     cfg = _conf()
     latest = rows[-1] if rows else None
     if not latest:
-        return Panel(Align.center(Text("Sentinel has no samples yet.\nInstall: macmon sentinel --install", style=AMBER)),
+        return Panel(Align.center(Text("Sentinel has no samples yet.\nInstall: aegis sentinel --install", style=AMBER)),
                      title=_banner(), border_style=AMBER, style=f"on {C['ground']}")
     findings = aegis.analyze(rows, cfg, time.time())
 
@@ -922,7 +922,7 @@ def show_snapshot():
     recent = _tail_alerts(3)
     if recent:
         console.print(Panel("\n".join(recent), title=f"[bold {AMBER}]LAST ALERTS[/]", border_style=AMBER, padding=(0, 1)))
-    console.print(Text("  levers: macmon sentinel --watch | --status | --log | --force-purge | --force-clean | --reap-orphans | --pause/--resume", style=DIM))
+    console.print(Text("  levers: aegis sentinel --watch | --status | --log | --force-purge | --force-clean | --reap-orphans | --pause/--resume", style=DIM))
 
 
 def show_watch(interval=3):
@@ -987,7 +987,7 @@ def _macmon(*args):
     try:
         subprocess.run([py, str(MACMON_PY), *args], cwd=str(REPO_DIR))
     except FileNotFoundError as e:
-        console.print(f"[red]macmon is unavailable ({e})[/]")
+        console.print(f"[red]aegis is unavailable ({e})[/]")
 
 
 def _plist(label: str, program_args: list[str], interval: int) -> str:
@@ -1015,27 +1015,58 @@ def _plist(label: str, program_args: list[str], interval: int) -> str:
 
 
 _TASK_NAME = "macmon-sentinel"  # schtasks / cron identifier (Windows/Linux)
-# Well-known homes of the `macmon` launcher when it is not on PATH: install.sh's
-# wrapper, Homebrew, pipx / pip --user. (A Finder-launched .app has a minimal PATH.)
+# Well-known homes of the CLI launcher when it is not on PATH: install.sh's
+# wrapper, Homebrew, pipx / uv tool / pip --user. (A Finder-launched .app has a
+# minimal PATH.) `aegis` is the command since the AegisForge rename; `macmon` is
+# the deprecated alias every install of this release still ships.
+_AEGIS_CANDIDATES = ("/usr/local/bin/aegis", "/opt/homebrew/bin/aegis",
+                     str(Path.home() / ".local/bin/aegis"))
 _MACMON_CANDIDATES = ("/usr/local/bin/macmon", "/opt/homebrew/bin/macmon",
                       str(Path.home() / ".local/bin/macmon"))
+# Bytes every launcher of ours carries: install.sh's wrapper names macmon.py, the
+# pip / uv console script (and the zip a Windows .exe launcher appends, stored
+# uncompressed) imports from the macmon module.
+_OUR_LAUNCHER_MARKERS = (b"macmon.py", b"from macmon import")
+
+
+def _is_our_launcher(path: str) -> bool:
+    """True when `path` is provably this CLI's launcher. `aegis` is a common
+    word: an unrelated `aegis` binary on PATH must never be scheduled every 60s."""
+    try:
+        if os.path.getsize(path) > 8_000_000:
+            return False
+        data = Path(path).read_bytes()
+    except OSError:
+        return False
+    return any(m in data for m in _OUR_LAUNCHER_MARKERS)
+
+
+def _probe(name: str, candidates) -> list[str]:
+    """Every launcher called `name`: PATH first, then the well-known homes."""
+    found = []
+    exe = shutil.which(name)
+    if exe:
+        found.append(exe)
+    for cand in candidates:
+        if cand not in found and os.path.isfile(cand) and os.access(cand, os.X_OK):
+            found.append(cand)
+    return found
 
 
 def find_macmon():
-    """Path of the installed `macmon` launcher, or None."""
-    exe = shutil.which("macmon")
-    if exe:
-        return exe
-    for cand in _MACMON_CANDIDATES:
-        if os.path.isfile(cand) and os.access(cand, os.X_OK):
-            return cand
-    return None
+    """Path of the installed CLI launcher, or None: `aegis` when it is provably
+    ours, else the legacy `macmon` alias (probed as before the rename)."""
+    for exe in _probe("aegis", _AEGIS_CANDIDATES):
+        if _is_our_launcher(exe):
+            return exe
+    found = _probe("macmon", _MACMON_CANDIDATES)
+    return found[0] if found else None
 
 
 def _sample_cmd() -> list[str]:
     """argv the scheduler runs every 60s. A checkout uses its own venv +
-    macmon.py (unchanged); otherwise the installed `macmon` launcher, else this
-    interpreter on macmon.py. The frozen AegisForge.app has neither a venv nor
+    macmon.py (unchanged); otherwise the installed `aegis` (or legacy `macmon`)
+    launcher, else this interpreter on macmon.py. The frozen AegisForge.app has neither a venv nor
     macmon.py and its sys.executable IS the app, so there an empty list means
     "nothing runnable": the install must refuse rather than register a job
     that fails every minute while --resume reports success."""
@@ -1067,8 +1098,8 @@ def _schedule_install() -> tuple[bool, str]:
     """Register a per-minute sampler with the OS scheduler. Returns (ok, note)."""
     cmd = _sample_cmd()
     if not cmd:
-        return (False, "no macmon to schedule -- install the CLI (install.sh or pip install -e .) "
-                       "and run 'macmon sentinel --resume'")
+        return (False, "no aegis CLI to schedule -- install the CLI (install.sh or pip install -e .) "
+                       "and run 'aegis sentinel --resume'")
     try:
         if IS_MAC:
             la_dir = Path.home() / "Library/LaunchAgents"
@@ -1119,11 +1150,11 @@ def install():
             icon = _build_notifier()
             console.print(f"[{DIM}]Notifications: {'branded ' + BRAND + ' icon' if icon else 'system icon'}.[/]")
         console.print(f"[{DIM}]Proactive detectors ON (notify-only): swap/RAM trend, load, process swarm, leaked orphans.[/]")
-        console.print(f"[{DIM}]View anytime: macmon sentinel   |   Live: macmon sentinel --watch[/]")
+        console.print(f"[{DIM}]View anytime: aegis sentinel   |   Live: aegis sentinel --watch[/]")
         run_sample()
     else:
         console.print(f"[red]Install failed: {note or 'scheduler error'}[/]")
-        console.print("[dim]You can still run 'macmon sentinel --sample' manually or via your own scheduler.[/]")
+        console.print("[dim]You can still run 'aegis sentinel --sample' manually or via your own scheduler.[/]")
 
 
 def uninstall():
@@ -1133,7 +1164,7 @@ def uninstall():
 
 def pause():
     _schedule_remove()
-    console.print(Text("Sentinel PAUSED. Resume: macmon sentinel --resume", style=AMBER))
+    console.print(Text("Sentinel PAUSED. Resume: aegis sentinel --resume", style=AMBER))
 
 
 def resume():
@@ -1197,7 +1228,7 @@ def enable_auto(aggressive: bool = False, reap: bool = False):
         title=_banner("auto-remediation"), border_style=MINT, style=f"on {C['ground']}"))
     if IS_MAC and not _purge_nopasswd_ready():
         console.print(Text("\nFor unattended purge, allow it without a password (one-time, run this):", style=AMBER))
-        console.print(Text("  macmon sentinel --setup-purge", style="bold white"))
+        console.print(Text("  aegis sentinel --setup-purge", style="bold white"))
         console.print(Text("  (without it, auto_purge is skipped -- notifications still fire.)", style=DIM))
     elif IS_MAC:
         console.print(Text("Passwordless purge already configured -- auto_purge is fully unattended.", style=GREEN))
@@ -1317,7 +1348,7 @@ def manual_reap():
     leaks = forge["leaks"]
     if not leaks:
         console.print(Text(f"No proven leak. ({len(forge['cands'])} dev process(es) sit under PID 1, but a leak needs a "
-                           f"parent the sentinel watched die -- see 'macmon sweep --orphans' for the heuristic sweep.)", style=DIM))
+                           f"parent the sentinel watched die -- see 'aegis sweep --orphans' for the heuristic sweep.)", style=DIM))
         return
     t = Table(title=f"Leaked orphans ({len(leaks)})", border_style=EMBER)
     for col, w in (("PID", 7), ("Name", 26), ("Family", 9), ("Proof", 30), ("State", 6)):

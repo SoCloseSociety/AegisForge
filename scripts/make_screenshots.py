@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render real macmon output to SVG "screenshots" for the README.
+"""Render real aegis output to SVG "screenshots" for the README.
 
 Uses rich's record+save_svg. Each capture patches the target module's
 `console` global with a recording Console so the real render is captured.
@@ -61,11 +61,11 @@ def cap_security(rec):
 if __name__ == "__main__":
     print("Rendering screenshots...")
     for name, title, fn in [
-        ("sentinel", "macmon sentinel", cap_sentinel),
-        ("health", "macmon health", cap_health),
-        ("ps", "macmon ps", cap_ps),
-        ("clean", "macmon clean --scan", cap_clean),
-        ("security", "macmon security --scan", cap_security),
+        ("sentinel", "aegis sentinel", cap_sentinel),
+        ("health", "aegis health", cap_health),
+        ("ps", "aegis ps", cap_ps),
+        ("clean", "aegis clean --scan", cap_clean),
+        ("security", "aegis security --scan", cap_security),
     ]:
         try:
             cap(name, title, fn)

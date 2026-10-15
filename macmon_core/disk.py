@@ -92,7 +92,7 @@ def _parse_size(size_str: str) -> int:
 
 def _scan_big_files(base: Path, min_bytes: int, file_type: str = None, older: int = None) -> list[dict]:
     """The largest files under ``base`` (top 50, biggest first) as dicts --
-    the walk behind ``macmon bigfiles`` and the app's Disk view."""
+    the walk behind ``aegis bigfiles`` and the app's Disk view."""
     now = time.time()
     max_results = 200
 
@@ -176,7 +176,7 @@ def find_big_files(
     base = Path(path).expanduser()
     min_bytes = _parse_size(min_size)
 
-    console.print(Panel(f"[bold]macmon bigfiles[/] -- {base} (min: {format_size(min_bytes)})", border_style="cyan"))
+    console.print(Panel(f"[bold]aegis bigfiles[/] -- {base} (min: {format_size(min_bytes)})", border_style="cyan"))
 
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console) as progress:
         task = progress.add_task("Scanning for large files...", total=None)
@@ -247,7 +247,7 @@ def _size_and_count(path: Path, skip_paths: set[str]) -> tuple[int, int]:
 
 def _disk_entries(base: Path) -> list[dict]:
     """Top-level entries of ``base`` with their sizes, biggest first (the
-    figures behind ``macmon disk`` and the app's Disk view). Raises OSError /
+    figures behind ``aegis disk`` and the app's Disk view). Raises OSError /
     PermissionError when ``base`` itself cannot be listed."""
     home = Path.home()
     # Never descend into these mount points wherever they appear -- not only at
@@ -292,7 +292,7 @@ def _disk_entries(base: Path) -> list[dict]:
 
 def analyze_disk(path: str = "~", json_out: bool = False):
     base = Path(path).expanduser()
-    console.print(Panel(f"[bold]macmon disk[/] -- {base}", border_style="cyan"))
+    console.print(Panel(f"[bold]aegis disk[/] -- {base}", border_style="cyan"))
 
     try:
         entries = _disk_entries(base)

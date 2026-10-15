@@ -2,7 +2,7 @@
 
 A home-screen **widget** that shows this phone's own health -- battery, storage,
 memory, network and screen-lock state -- in the Sentinel House "Lunar" look. It is
-the mobile companion to the `macmon` / AegisForge system monitor.
+the mobile companion to the AegisForge (`aegis`, formerly `macmon`) system monitor.
 
 - **On-device only.** No account, no server, no network call, no tracking. Every
   number is read from the phone itself. The one permission (`ACCESS_NETWORK_STATE`)

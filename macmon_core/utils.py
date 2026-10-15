@@ -320,12 +320,12 @@ def smart_suggestions(
     tips = []
     if ram_percent > 85:
         tips.append(
-            "Memory pressure high -- run `macmon purge` or close browser tabs"
+            "Memory pressure high -- run `aegis purge` or close browser tabs"
         )
     if zombie_count > 0 or orphan_count > 0:
         tips.append(
-            f"{zombie_count} zombies + {orphan_count} orphans -- run `macmon sweep`"
+            f"{zombie_count} zombies + {orphan_count} orphans -- run `aegis sweep`"
         )
     if cpu_percent > 85:
-        tips.append("CPU load high -- check `macmon ps --sort cpu` for hogs")
+        tips.append("CPU load high -- check `aegis ps --sort cpu` for hogs")
     return tips[:3]
