@@ -80,6 +80,18 @@ $SUDO mkdir -p "$BIN_DIR"
 install_wrapper() {
     # $1 = command name, $2 = extra env for the exec line ("" for none)
     local target="$BIN_DIR/$1"
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        # `aegis` (and `macmon`) are common names: never clobber another tool's
+        # launcher, and never write THROUGH a symlink (an Intel Homebrew link in
+        # /usr/local/bin points into the Cellar). Only our own wrapper or console
+        # script is replaced, by a fresh file.
+        if [ -L "$target" ] || ! grep -qs -e 'macmon\.py' -e 'from macmon import' "$target"; then
+            echo -e "${YELLOW}Skipped $target: another '$1' is already installed there (left untouched).${NC}"
+            echo -e "${YELLOW}  Run this CLI with: \"$VENV_DIR/bin/python\" \"$APP_DIR/macmon.py\"${NC}"
+            return 0
+        fi
+        $SUDO rm -f "$target"
+    fi
     echo -e "${CYAN}Creating $1 command...${NC}"
     $SUDO bash -c "cat > '$target'" << WRAPPER_EOF
 #!/bin/bash

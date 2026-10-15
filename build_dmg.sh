@@ -1,5 +1,5 @@
 #!/bin/bash
-# build_dmg.sh — Build macmon.app and package into a DMG
+# build_dmg.sh -- Build macmon.app and package into a DMG
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -73,7 +73,7 @@ PLIST_EOF
 # This opens Terminal.app and runs macmon dashboard
 cat > "$APP_BUNDLE/Contents/MacOS/macmon-launcher" << 'LAUNCHER_EOF'
 #!/bin/bash
-# macmon.app launcher — opens Terminal with macmon dashboard
+# macmon.app launcher -- opens Terminal with macmon dashboard
 
 MACMON_DIR="$HOME/.macmon"
 VENV_PYTHON="$MACMON_DIR/venv/bin/python"
@@ -91,7 +91,7 @@ else
         osascript -e 'tell application "Terminal" to do script "macmon; exit"'
         exit 0
     fi
-    osascript -e 'display dialog "macmon is not installed yet.\n\nInstall it with:\n  git clone ... && cd macmon && bash install.sh" with title "macmon" buttons {"OK"} default button "OK" with icon caution'
+    osascript -e 'display dialog "macmon is not installed yet.\n\nInstall it with:\n  git clone https://github.com/SoCloseSociety/AegisForge && cd AegisForge && bash install.sh" with title "macmon" buttons {"OK"} default button "OK" with icon caution'
     exit 1
 fi
 

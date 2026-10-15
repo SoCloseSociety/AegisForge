@@ -1,7 +1,8 @@
 """The AegisForge rename (formerly macmon): `aegis` is the command, `macmon` a
 deprecated alias that behaves the same plus one stderr line on a terminal; the
 scheduler prefers an `aegis` launcher only when it is provably ours; every repo
-URL names SoCloseSociety/AegisForge. Hermetic: no network, no live subprocess.
+URL names SoCloseSociety/AegisForge. Hermetic: no network (install.sh's wrapper
+function runs in bash against a scratch directory).
 """
 import io
 import json
@@ -47,7 +48,7 @@ class TestEntryPoints:
         macmon.macmon_alias()
         assert seen == {"prog_name": "macmon"}
         assert err.getvalue() == macmon.DEPRECATION_NOTICE + "\n"
-        assert "aegis" in macmon.DEPRECATION_NOTICE and "—" not in macmon.DEPRECATION_NOTICE
+        assert "aegis" in macmon.DEPRECATION_NOTICE and "\u2014" not in macmon.DEPRECATION_NOTICE
         # A child the CLI spawns is not an alias call: the marker is not inherited.
         assert macmon.ALIAS_ENV not in os.environ
 
@@ -148,6 +149,56 @@ class TestInstallScript:
         # Wrappers carry a marker sentinel._is_our_launcher recognises.
         assert '"$APP_DIR/macmon.py"' in sh
 
+    @staticmethod
+    def _run_install_wrapper(tmp_path, name, env_prefix=""):
+        """Run install.sh's own install_wrapper() (extracted verbatim) against a
+        scratch BIN_DIR. Returns the bash result."""
+        import subprocess
+        sh = (REPO / "install.sh").read_text(encoding="utf-8")
+        fn = re.search(r"^install_wrapper\(\) \{\n.*?^\}\n", sh, re.S | re.M).group(0)
+        script = (f'set -e\nBIN_DIR="{tmp_path / "bin"}"\nSUDO=""\nVENV_DIR=/v\nAPP_DIR=/a\n'
+                  'GREEN= YELLOW= CYAN= NC=\n' + fn + f'install_wrapper {name} "{env_prefix}"\n')
+        return subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+
+    @pytest.mark.skipif(sys.platform.startswith("win"), reason="bash")
+    def test_wrapper_is_written_and_our_old_wrapper_replaced(self, tmp_path):
+        (tmp_path / "bin").mkdir()
+        target = tmp_path / "bin" / "macmon"
+        target.write_text('#!/bin/bash\nexec "/old/python" "/old/macmon.py" "$@"\n')   # pre-rename wrapper
+        r = self._run_install_wrapper(tmp_path, "macmon", "AEGISFORGE_INVOKED_AS=macmon ")
+        assert r.returncode == 0, r.stderr
+        assert target.read_text() == ('#!/bin/bash\nAEGISFORGE_INVOKED_AS=macmon exec "/v/bin/python" '
+                                      '"/a/macmon.py" "$@"\n')
+        r = self._run_install_wrapper(tmp_path, "aegis")
+        assert r.returncode == 0, r.stderr
+        assert (tmp_path / "bin" / "aegis").read_text().endswith('\nexec "/v/bin/python" "/a/macmon.py" "$@"\n')
+
+    @pytest.mark.skipif(sys.platform.startswith("win"), reason="bash + symlink")
+    def test_an_unrelated_aegis_is_never_clobbered(self, tmp_path):
+        """`aegis` is a common name: install.sh must not overwrite another tool,
+        nor write through a symlink into it (Intel Homebrew links /usr/local/bin
+        into the Cellar)."""
+        (tmp_path / "bin").mkdir()
+        other = tmp_path / "bin" / "aegis"
+        other.write_text("#!/bin/sh\necho another aegis\n")
+        r = self._run_install_wrapper(tmp_path, "aegis")
+        assert r.returncode == 0, r.stderr
+        assert other.read_text() == "#!/bin/sh\necho another aegis\n"
+        assert "Skipped" in r.stdout
+
+        cellar = tmp_path / "cellar-aegis"
+        cellar.write_text("#!/bin/sh\necho brewed aegis\n")
+        other.unlink()
+        other.symlink_to(cellar)
+        r = self._run_install_wrapper(tmp_path, "aegis")
+        assert r.returncode == 0, r.stderr
+        assert other.is_symlink() and cellar.read_text() == "#!/bin/sh\necho brewed aegis\n"
+
+    def test_the_dmg_launcher_points_at_the_new_clone_dir(self):
+        sh = (REPO / "build_dmg.sh").read_text(encoding="utf-8")
+        assert "cd macmon " not in sh and "cd AegisForge" in sh
+        assert "\u2014" not in sh
+
 
 # ── repo URLs ────────────────────────────────────────────────────────────
 
@@ -202,7 +253,7 @@ class TestRepoUrls:
         assert any("(formerly macmon)" in l for l in after[3:6])
 
     def test_readme_has_no_em_dash(self):
-        assert "—" not in (REPO / "README.md").read_text(encoding="utf-8")
+        assert "\u2014" not in (REPO / "README.md").read_text(encoding="utf-8")
 
 
 # ── autopilot daemon identity ────────────────────────────────────────────
