@@ -14,6 +14,17 @@ table the sampler already took. Safe by default, by construction:
   * LADDER, mildest first, each step REVERSIBLE: renice (+10) -> suspend
     (SIGSTOP, ALWAYS resumed after ``guard_suspend_max_s``) -> terminate
     (SIGTERM, OFF unless ``guard_allow_kill``).
+  * A RENICE ONLY WHEN IT CAN BE UNDONE: lowering a nice value back needs root,
+    or on Linux an RLIMIT_NICE that allows it (it is 0 by default for a desktop
+    user). When the original value could not be restored the guard skips the
+    renice (logged once) and goes straight to the pause, which can always be
+    undone. An undo that still fails KEEPS its record and says so.
+  * NOTHING STAYS PAUSED: the pause is recorded (``persist``, atomic, under a
+    lock in the sampler) BEFORE the SIGSTOP is sent -- no record, no SIGSTOP --
+    an independent resume is scheduled with the OS where it can be (systemd
+    ``--user`` timer), and every pass SWEEPS: a stopped allow-listed process of
+    this user that has no pause record is resumed, in every mode, so a record
+    lost to a killed sampler or a stale writer still ends in a resume.
   * DRY-RUN FIRST: in ``act`` mode a step only runs after the SAME step on the
     SAME process (pid + start time) was logged as "would" on an earlier
     sample. ``dry-run`` mode (the default) never acts at all.
@@ -22,14 +33,16 @@ table the sampler already took. Safe by default, by construction:
     to the notifier the sentinel passes in.
 
 `aegis guard --undo` resumes every suspended process and restores every nice
-value the guard changed.
+value the guard changed; whatever it could not undo is reported and kept.
 """
 from __future__ import annotations
 
 import fnmatch
 import getpass
 import os
+import shutil
 import signal
+import subprocess
 import time
 
 from .platform_compat import IS_LINUX
@@ -179,6 +192,51 @@ class Signaller:
         import psutil
         psutil.Process(pid).nice(value)
 
+    def can_restore_nice(self, pid: int, value: int | None = None) -> bool:
+        """Could this user set ``pid``'s nice back DOWN to ``value`` (default: its
+        current nice) after a renice?
+
+        Raising a nice value is always allowed; lowering it is not. root may;
+        on Linux an unprivileged user may only go down to ``20 - RLIMIT_NICE``
+        of the TARGET process (0 on a stock desktop, so: never). Everywhere
+        else (macOS / BSD) only root may. Windows: no (the guard is off there)."""
+        if os.name == "nt":
+            return False
+        try:
+            if os.geteuid() == 0:
+                return True
+        except AttributeError:
+            return False
+        if not IS_LINUX:
+            return False
+        try:
+            import psutil
+            import resource
+            proc = psutil.Process(pid)
+            value = proc.nice() if value is None else value
+            soft = proc.rlimit(psutil.RLIMIT_NICE)[0]
+        except Exception:
+            return False
+        if soft == resource.RLIM_INFINITY:
+            return True
+        return 20 - int(value) <= int(soft)
+
+    def schedule_resume(self, pid: int, after_s: int) -> bool:
+        """An OS-side failsafe for a pause: a transient systemd --user timer that
+        sends SIGCONT even if no sampler ever runs again. Best effort (Linux with
+        systemd only); the persisted record + the sweep remain the primary path.
+        SIGCONT to a running process is a no-op, so a late or duplicate one is harmless."""
+        if not IS_LINUX or not shutil.which("systemd-run"):
+            return False
+        kill = shutil.which("kill") or "/bin/kill"
+        try:
+            r = subprocess.run(["systemd-run", "--user", "--quiet", "--collect", f"--on-active={int(after_s)}s",
+                                "--timer-property=AccuracySec=5s", kill, "-CONT", str(int(pid))],
+                               stdin=subprocess.DEVNULL, capture_output=True, timeout=10)
+            return r.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
+
     def suspend(self, pid: int):
         os.kill(pid, signal.SIGSTOP)
 
@@ -217,8 +275,13 @@ def _msg(e) -> str:
         return {"renice": f"Lowered the priority of {who}",
                 "suspend": f"Paused {who}; it resumes on its own",
                 "kill": f"Stopped {who} (SIGTERM)"}.get(e["step"], f"{e['step']} {who}")
+    if e["kind"] == "resume" and e["step"] == "sweep":
+        return f"Resumed {e['name']} (pid {e['pid']}): it was left paused with no record of the pause"
     if e["kind"] == "resume":
         return f"Resumed {e['name']} (pid {e['pid']})"
+    if e["kind"] == "skip" and e["step"] == "renice":
+        return (f"Not lowering the priority of {who}: this user could not restore it afterwards "
+                f"({e.get('reason') or 'no permission'}); the next step is a pause, which can always be undone")
     if e["kind"] == "kill-off":
         return f"{who} is still running away; stopping it is disabled (notify only)"
     if e["kind"] == "rate":
@@ -226,10 +289,24 @@ def _msg(e) -> str:
     return f"{e['kind']} {e['step']} {who}"
 
 
+def _gone(err: BaseException) -> bool:
+    """The process no longer exists (so there is nothing left to undo)."""
+    if isinstance(err, ProcessLookupError):
+        return True
+    try:
+        import psutil
+        return isinstance(err, psutil.NoSuchProcess)
+    except Exception:
+        return False
+
+
 def step(table: list[dict], cfg: dict, g: dict, now: float, ram_critical: bool = False,
-         sig: Signaller | None = None, self_pids=None, units_of=None, me: str | None = None) -> list[dict]:
-    """One guard pass. Mutates ``g`` (persisted by the caller), returns the log
-    entries of this pass (each with a ``msg``)."""
+         sig: Signaller | None = None, self_pids=None, units_of=None, me: str | None = None,
+         persist=None) -> list[dict]:
+    """One guard pass. Mutates ``g`` and returns the log entries of this pass
+    (each with a ``msg``). ``persist()`` writes ``g`` to durable storage; it is
+    called BEFORE any SIGSTOP (a pause that cannot be recorded is not sent).
+    The caller still persists ``g`` after the pass."""
     sig = sig or Signaller()
     mode = mode_of(cfg)
     out: list[dict] = []
@@ -252,10 +329,30 @@ def step(table: list[dict], cfg: dict, g: dict, now: float, ram_critical: bool =
                 try:
                     sig.resume(t["pid"])
                     log("resume", "suspend", t)
-                except OSError:
-                    pass
+                except Exception as e:
+                    if not _gone(e):   # still there, still stopped: keep the record, retry next pass
+                        log("error", "resume", t, reason=repr(e)[:120])
+                        continue
             t["suspended_at"] = None
             t["resumed_at"] = now
+
+    # 2. SWEEP: a stopped (SIGSTOP, not a debugger's tracing stop) process the
+    # guard could have paused, with no pause record, is a pause whose record was
+    # lost (sampler killed mid-sample, stale writer). Resume it, in every mode.
+    selfp = self_pids if self_pids is not None else _self_pids()
+    recorded = {int(t["pid"]) for t in targets.values() if t.get("suspended_at")}
+    for p in table:
+        if str(p.get("status") or "").lower() != "stopped" or int(p.get("pid") or 0) in recorded:
+            continue
+        ok, _why = eligible(p, cfg, selfp, units_of(p["pid"]) if units_of else None, me)
+        if not ok or not sig.same(p["pid"], float(p.get("ct") or 0)):
+            continue
+        try:
+            sig.resume(p["pid"])
+            log("resume", "sweep", p)
+        except Exception as e:
+            if not _gone(e):
+                log("error", "sweep", p, reason=repr(e)[:120])
     if mode == "off":
         return out
 
@@ -273,7 +370,6 @@ def step(table: list[dict], cfg: dict, g: dict, now: float, ram_critical: bool =
             targets[key]["would"] = None   # cooled down: a new episode logs its dry-run again
     g["streak"] = streak
 
-    selfp = self_pids if self_pids is not None else _self_pids()
     for key, n in sorted(streak.items(), key=lambda kv: -kv[1]):
         if n < sustain:
             continue
@@ -292,6 +388,15 @@ def step(table: list[dict], cfg: dict, g: dict, now: float, ram_critical: bool =
         if t["step"] >= len(LADDER):
             continue
         nxt = LADDER[t["step"]]
+        if nxt == "renice":
+            try:
+                restorable = sig.can_restore_nice(p["pid"])
+            except Exception:
+                restorable = False
+            if not restorable:
+                log("skip", "renice", p, reason="RLIMIT_NICE / not root")
+                t["step"] += 1
+                nxt = LADDER[t["step"]]
         if nxt == "kill" and cfg.get("guard_allow_kill", DEFAULTS["guard_allow_kill"]) is not True:
             if not t.get("kill_noted"):
                 t["kill_noted"] = True
@@ -314,8 +419,21 @@ def step(table: list[dict], cfg: dict, g: dict, now: float, ram_critical: bool =
             if nxt == "renice":
                 t["orig_nice"] = sig.renice(p["pid"], _num(cfg, "guard_renice", int))
             elif nxt == "suspend":
-                sig.suspend(p["pid"])
+                # Record FIRST: a sampler that dies right after the SIGSTOP must
+                # leave a record a later pass resumes. No record, no SIGSTOP.
                 t["suspended_at"] = now
+                try:
+                    if persist:
+                        persist()
+                except Exception:
+                    t["suspended_at"] = None
+                    raise
+                sig.schedule_resume(p["pid"], _num(cfg, "guard_suspend_max_s", int) + 120)
+                try:
+                    sig.suspend(p["pid"])
+                except Exception:
+                    t["suspended_at"] = None
+                    raise
             else:
                 sig.terminate(p["pid"])
         except Exception as e:  # AccessDenied / gone: log, never crash the sampler
@@ -330,25 +448,39 @@ def step(table: list[dict], cfg: dict, g: dict, now: float, ram_critical: bool =
 
 
 def undo(g: dict, sig: Signaller | None = None) -> list[str]:
-    """Resume every process the guard paused and restore every nice it changed."""
+    """Resume every process the guard paused and restore every nice it changed.
+
+    A change that could NOT be undone (the process is still there, the call
+    failed) keeps its record in ``g`` and yields a line starting with
+    "could not" -- never a silent success."""
     sig = sig or Signaller()
-    lines = []
+    lines, kept = [], {}
     for key, t in list(g.get("targets", {}).items()):
         if not sig.same(t["pid"], t["ct"]):
-            continue
+            continue   # gone (or the pid was reused): nothing of ours left to undo
+        failed = False
         if t.get("suspended_at"):
             try:
                 sig.resume(t["pid"])
+                t["suspended_at"] = None
                 lines.append(f"resumed {t['name']} (pid {t['pid']})")
-            except OSError:
-                pass
+            except Exception as e:
+                if not _gone(e):
+                    failed = True
+                    lines.append(f"could not resume {t['name']} (pid {t['pid']}): {e!r}"[:200])
         if "orig_nice" in t:
             try:
                 sig.set_nice(t["pid"], t["orig_nice"])
                 lines.append(f"restored nice {t['orig_nice']} on {t['name']} (pid {t['pid']})")
-            except Exception:
-                pass
-    g["targets"] = {}
+                t.pop("orig_nice")
+            except Exception as e:
+                if not _gone(e):
+                    failed = True
+                    lines.append(f"could not restore nice {t['orig_nice']} on {t['name']} (pid {t['pid']}): "
+                                 f"{e!r} -- the record is kept"[:240])
+        if failed:
+            kept[key] = t
+    g["targets"] = kept
     g["streak"] = {}
     return lines
 

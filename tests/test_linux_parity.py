@@ -415,6 +415,12 @@ class FakeSig(guard.Signaller):
     def same(self, pid, ct):
         return True
 
+    def can_restore_nice(self, pid, value=None):
+        return True   # tests/test_guard_reversible.py covers the case where it cannot
+
+    def schedule_resume(self, pid, after_s):
+        return False  # never a real systemd timer from a test
+
     def renice(self, pid, inc):
         self.calls.append(("renice", pid))
         old = self.nice.get(pid, 0)

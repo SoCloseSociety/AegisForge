@@ -372,6 +372,111 @@ def _read_json(path, default):
         return default
 
 
+# ── sentinel.state: one writer at a time, never half a file ──────────────
+# The guard's pause records live here: losing one can leave a process paused.
+# So every read-modify-write of the guard section runs under an flock, every
+# write is atomic (tmp + fsync + replace), and the sampler's final write keeps
+# the guard section that is on disk (the guard stage already wrote it, and an
+# `aegis guard --undo` may have changed it since).
+
+def _astate_lock_path() -> Path:
+    return ASTATE.with_name("sentinel.state.lock")
+
+
+class _AstateLock:
+    def __init__(self, timeout: float = 60.0):
+        self.timeout, self.fh = timeout, None
+
+    def __enter__(self):
+        try:
+            import fcntl
+        except ImportError:        # Windows: no flock; the guard is off there
+            return self
+        ASTATE.parent.mkdir(parents=True, exist_ok=True)
+        self.fh = open(_astate_lock_path(), "a")
+        deadline = time.monotonic() + self.timeout
+        while True:
+            try:
+                fcntl.flock(self.fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return self
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    self.fh.close()
+                    self.fh = None
+                    raise TimeoutError(f"{ASTATE} is locked by another aegis process")
+                time.sleep(0.05)
+
+    def __exit__(self, *exc):
+        if self.fh is not None:
+            try:
+                import fcntl
+                fcntl.flock(self.fh.fileno(), fcntl.LOCK_UN)
+            finally:
+                self.fh.close()
+                self.fh = None
+        return False
+
+
+def _astate_lock(timeout: float = 60.0) -> _AstateLock:
+    return _AstateLock(timeout)
+
+
+def _write_astate(d: dict):
+    """Atomic: a reader (or a crash) never sees half a state file."""
+    ASTATE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ASTATE.with_name(f".sentinel.state.{os.getpid()}.tmp")
+    with open(tmp, "w") as f:
+        f.write(json.dumps(d))
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    os.replace(tmp, ASTATE)
+
+
+def _commit_astate(astate: dict):
+    """The sampler's last write: everything it measured, but the guard section
+    as it is ON DISK (written by the guard stage under the lock, maybe changed
+    since by an undo) -- a stale copy must never bring a record back or drop one."""
+    with _astate_lock():
+        disk = _read_json(ASTATE, {})
+        if isinstance(disk, dict) and "guard" in disk:
+            astate["guard"] = disk["guard"]
+        _write_astate(astate)
+
+
+def _guard_undo_locked(sig=None) -> list[str]:
+    """Resume / restore everything the guard changed, under the state lock, and log it."""
+    with _astate_lock():
+        astate = _read_json(ASTATE, {})
+        if not isinstance(astate, dict):
+            astate = {}
+        g = astate.setdefault("guard", {})
+        if not g.get("targets"):
+            return []
+        lines = _guard.undo(g, sig)
+        _write_astate(astate)
+    if lines:
+        now = int(time.time())
+        try:
+            with open(_guard_log_path(), "a") as f:
+                for line in lines:
+                    f.write(json.dumps({"ts": now, "kind": "error" if line.startswith("could not") else "undo",
+                                        "step": "undo", "msg": line}) + "\n")
+        except OSError:
+            pass
+        bad = [x for x in lines if x.startswith("could not")]
+        if bad:
+            _notify(f"{ALERT_TITLE} guard", bad[0], "critical")
+    return lines
+
+
+def _print_undo(lines: list[str]):
+    for line in lines:
+        console.print(Text("  " + line, style=RED if line.startswith("could not") else DIM))
+
+
 def _claude_sessions(procs=None):
     """Live Claude Code sessions (VSCode extension), with current CPU and age."""
     out = []
@@ -704,9 +809,21 @@ def run_sample():
     # ── The guard (Linux default: dry-run; see guard.py for the safety rules) ──
     gsum = None
     try:
-        g = astate.setdefault("guard", {})
         ram_crit = vm.percent > cfg["ram_critical"]
-        entries = _guard.step(table, cfg, g, now, ram_critical=ram_crit)
+        with _astate_lock(timeout=20):
+            # the guard section is read fresh under the lock (an undo may have run
+            # since this sample started) and written back before AND after any pause
+            disk = _read_json(ASTATE, {})
+            g = disk.get("guard") if isinstance(disk, dict) and isinstance(disk.get("guard"), dict) else {}
+            astate["guard"] = g
+
+            def persist():
+                cur = _read_json(ASTATE, {})
+                cur = cur if isinstance(cur, dict) else {}
+                cur["guard"] = g
+                _write_astate(cur)
+            entries = _guard.step(table, cfg, g, now, ram_critical=ram_crit, persist=persist)
+            persist()
         if entries:
             with open(_guard_log_path(), "a") as f:
                 for e in entries:
@@ -743,9 +860,9 @@ def run_sample():
         fired.append(("error", f"security audit skipped this sample: {e!r}"))
 
     try:
-        ASTATE.write_text(json.dumps(astate))
-    except Exception:
-        pass
+        _commit_astate(astate)
+    except Exception as e:
+        fired.append(("error", f"state not saved this sample: {e!r}"))
     _write_status(rec, gsum, sec, fired, now)
     if fired:
         with open(ALERTS_LOG, "a") as f:
@@ -1401,12 +1518,25 @@ def install():
         console.print("[dim]You can still run 'aegis sentinel --sample' manually or via your own scheduler.[/]")
 
 
+def _undo_before_stopping() -> bool:
+    """Once the sampler stops nothing resumes a pause: undo the guard FIRST."""
+    try:
+        lines = _guard_undo_locked()
+    except Exception as e:
+        console.print(Text(f"Could not undo the guard's changes first: {e!r} -- run 'aegis guard --undo'.", style=RED))
+        return False
+    _print_undo(lines)
+    return not any(x.startswith("could not") for x in lines)
+
+
 def uninstall():
+    _undo_before_stopping()
     _schedule_remove()
     console.print("[yellow]Sentinel uninstalled.[/]")
 
 
 def pause():
+    _undo_before_stopping()
     _schedule_remove()
     console.print(Text("Sentinel PAUSED. Resume: aegis sentinel --resume", style=AMBER))
 
@@ -1628,24 +1758,23 @@ def run_guard(status=False, log=False, undo=False, mode=None, json_out=False):
     console.push_theme(AEGIS_THEME)
     MACMON_DIR.mkdir(exist_ok=True)
     cfg = _conf()
-    astate = _read_json(ASTATE, {})
-    g = astate.setdefault("guard", {})
     if mode is not None:
         m = mode.strip().lower()
         if m not in _guard.MODES:
             console.print(f"[red]--mode must be one of {', '.join(_guard.MODES)}[/]")
             return
         _write_conf({"guard_mode": m})
-        lines = _guard.undo(g) if m == "off" else []
-        ASTATE.write_text(json.dumps(astate))
-        console.print(f"Guard mode: [bold]{m}[/]" + (f" ({len(lines)} change(s) undone)" if lines else ""))
+        lines = _guard_undo_locked() if m == "off" else []
+        done = [x for x in lines if not x.startswith("could not")]
+        console.print(f"Guard mode: [bold]{m}[/]" + (f" ({len(done)} change(s) undone)" if done else ""))
+        _print_undo([x for x in lines if x.startswith("could not")])
         return
     if undo:
-        lines = _guard.undo(g)
-        ASTATE.write_text(json.dumps(astate))
-        for line in lines or ["nothing to undo"]:
-            console.print("  " + line, markup=False)
+        lines = _guard_undo_locked()
+        _print_undo(lines or ["nothing to undo"])
         return
+    astate = _read_json(ASTATE, {})
+    g = astate.setdefault("guard", {})
     rows = _guard_log_tail(200)
     summ = _guard.summary(g, rows, cfg)
     if json_out:
@@ -1661,7 +1790,7 @@ def run_guard(status=False, log=False, undo=False, mode=None, json_out=False):
     t = Table.grid(padding=(0, 2))
     t.add_row("Mode", Text(summ["mode"], style={"off": DIM, "dry-run": AMBER, "act": GREEN}[summ["mode"]]))
     t.add_row("May act on (allow-list)", Text(", ".join(summ["allow"]) or "nothing", style=DIM))
-    t.add_row("Ladder", Text("renice -> pause (auto-resumed) -> " + ("terminate" if summ["kill"] else
+    t.add_row("Ladder", Text("renice (only when it can be undone) -> pause (auto-resumed) -> " + ("terminate" if summ["kill"] else
                              "notify only (terminate disabled)"), style=DIM))
     t.add_row("Last 24 h", Text(f"{summ['acts_24h']} action(s), {summ['would_24h']} dry-run line(s)", style=DIM))
     t.add_row("Paused now", Text(", ".join(summ["suspended"]) or "none", style=DIM))

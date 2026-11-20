@@ -102,9 +102,15 @@ pnpm / yarn / bun) is cross-platform, and the pip cache is resolved per OS
 thumbnailers by default) are ever touched; interactive apps, the desktop session,
 shells, system services, containers, the VPN and local LLM runtimes are protected by
 name, command line and systemd unit. The ladder is renice, then pause (always
-resumed after 5 min), then terminate only if `guard_allow_kill` is set. In `act`
-mode every step is logged as a dry-run on an earlier sample first, at most 6 actions
-an hour, and `aegis guard --undo` reverts everything.
+resumed after 5 min), then terminate only if `guard_allow_kill` is set. A renice
+happens only when this user could restore the old priority afterwards (root, or a
+Linux RLIMIT_NICE that allows it; a stock desktop user cannot, so the guard goes
+straight to the pause). A pause is written to disk (atomic, locked) before the
+SIGSTOP, a systemd --user timer resumes it even if the sampler never runs again,
+and every sample resumes a stopped allow-listed process that has no pause record.
+In `act` mode every step is logged as a dry-run on an earlier sample first, at most
+6 actions an hour. `aegis guard --undo` (and `aegis sentinel --pause` / `--uninstall`,
+which undo first) reverts every change it can and reports, and keeps, any it cannot.
 
 <sup>4</sup> Read-only by default; as a normal user the checks that need root say
 so (N/A) instead of guessing. `--apply` (root) only runs the low-risk fixes
