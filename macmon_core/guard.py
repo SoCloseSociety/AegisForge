@@ -428,7 +428,10 @@ def step(table: list[dict], cfg: dict, g: dict, now: float, ram_critical: bool =
                 except Exception:
                     t["suspended_at"] = None
                     raise
-                sig.schedule_resume(p["pid"], _num(cfg, "guard_suspend_max_s", int) + 120)
+                try:   # best effort: the record + the sweep are the primary path
+                    getattr(sig, "schedule_resume")(p["pid"], _num(cfg, "guard_suspend_max_s", int) + 120)
+                except Exception:
+                    pass
                 try:
                     sig.suspend(p["pid"])
                 except Exception:

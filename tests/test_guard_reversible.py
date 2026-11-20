@@ -357,3 +357,22 @@ def test_a_sampler_killed_right_after_the_pause_leaves_the_record_on_disk(tmp_pa
     assert ("suspend", 999999) in sig.calls
     on_disk = json.loads(sentinel.ASTATE.read_text())["guard"]["targets"][key]
     assert on_disk["suspended_at"]
+
+
+@pytest.mark.parametrize("variant", ["missing", "raises"])
+def test_the_os_failsafe_is_best_effort(variant):
+    """An integrator's duck-typed Signaller may not have schedule_resume, and the OS call
+    may blow up: the pause (already recorded) still happens, the guard does not break."""
+    class Duck(FakeSig):
+        pass
+    if variant == "missing":
+        Duck.schedule_resume = property(lambda self: (_ for _ in ()).throw(AttributeError("schedule_resume")))
+    else:
+        def boom(self, pid, after_s):
+            raise RuntimeError("no user bus")
+        Duck.schedule_resume = boom
+    sig, g, out = Duck(), {}, []
+    for i in range(6):
+        out += step([proc()], cfg(**ACT), g, 60 * i, sig)
+    assert ("suspend", 500) in sig.calls
+    assert not any(e["kind"] == "error" for e in out)
