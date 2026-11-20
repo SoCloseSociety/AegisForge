@@ -86,8 +86,22 @@ def run_security(
     unblock_ip: str = None,
     quarantine: str = None,
     json_out: bool = False,
+    apply: bool = False,
 ):
-    msg = require_os("macOS")
+    from .platform_compat import IS_LINUX
+    if IS_LINUX:
+        from . import linux_security
+        if block_ip or unblock_ip or quarantine:
+            console.print("[yellow]--block-ip / --unblock-ip / --quarantine are macOS-only (pf). "
+                          "On Linux use nftables, and `aegis kill` / `aegis suspend` for a process.[/]")
+            return
+        only = (("firewall",) if firewall else ("listening",) if connections else
+                ("remote_tools",) if remote else ("processes",) if malware else ())
+        if rules:
+            only = ("firewall", "ssh", "apparmor", "sudoers")
+        linux_security.run(json_out=json_out, apply=apply, only=only)
+        return
+    msg = require_os("macOS", "Linux")
     if msg:
         console.print(f"[yellow]{msg}[/]")
         return

@@ -45,7 +45,13 @@ def run_uninstaller(
     permanent: bool = False,
     force_yes: bool = False,
 ):
-    msg = require_os("macOS")
+    from .platform_compat import IS_LINUX
+    if IS_LINUX:
+        from . import linux_system
+        linux_system.run_uninstaller(app_name=app_name, scan_only=scan_only, list_apps=list_apps,
+                                     permanent=permanent, force_yes=force_yes)
+        return
+    msg = require_os("macOS", "Linux")
     if msg:
         console.print(f"[yellow]{msg}[/]")
         return

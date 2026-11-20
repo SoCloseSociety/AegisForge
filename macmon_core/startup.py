@@ -29,7 +29,13 @@ def run_startup(
     audit: bool = False,
     force_yes: bool = False,
 ):
-    msg = require_os("macOS")
+    from .platform_compat import IS_LINUX
+    if IS_LINUX:
+        from . import linux_system
+        linux_system.run_startup(list_items=list_items, disable=disable, enable=enable, delete=delete,
+                                 broken=broken, audit=audit, force_yes=force_yes)
+        return
+    msg = require_os("macOS", "Linux")
     if msg:
         console.print(f"[yellow]{msg}[/]")
         return

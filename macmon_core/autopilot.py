@@ -33,6 +33,15 @@ MAX_AUTOPILOT_LOG_SIZE = 5 * 1024 * 1024  # 5 MB
 # ── Autopilot Daemon ─────────────────────────────────────────────────────
 
 def run_autopilot(start: bool = False, stop: bool = False, status: bool = False, log: bool = False):
+    from .platform_compat import IS_LINUX
+    if IS_LINUX:
+        # Linux equivalent: the sentinel timer + its guard ARE the autopilot
+        # (60 s sampler, trend alerts, safe allow-listed remediation).
+        from . import sentinel
+        console.print("[dim]On Linux the autopilot is the sentinel (systemd --user timer) + its guard.[/]")
+        sentinel.run_sentinel(install_flag=start, uninstall_flag=stop, status=status or not (start or stop or log),
+                              log=log)
+        return
     msg = require_os("macOS")
     if msg:
         console.print(f"[yellow]{msg}[/]")
@@ -606,6 +615,9 @@ def _toggle_dnd(cfg: dict, enable: bool):
 
 def enter_focus():
     msg = require_os("macOS")
+    if msg and sys.platform.startswith("linux"):
+        msg += (" On Linux, quitting apps automatically is not done: the guard handles runaway"
+                " background processes safely instead (`aegis guard`).")
     if msg:
         console.print(f"[yellow]{msg}[/]")
         return

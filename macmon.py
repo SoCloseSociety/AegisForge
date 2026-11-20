@@ -438,6 +438,7 @@ def security(
     unblock_ip: Optional[str] = typer.Option(None, "--unblock-ip", help="Unblock an IP address"),
     quarantine: Optional[str] = typer.Option(None, "--quarantine", help="Kill + block a process"),
     json_out: bool = typer.Option(False, "--json", help="JSON output"),
+    apply: bool = typer.Option(False, "--apply", help="Linux: apply the low-risk fixes (root; never SSH/firewall)"),
 ):
     """Network security, malware detection & remote access monitor."""
     from macmon_core.security import run_security
@@ -445,8 +446,44 @@ def security(
         scan=scan, connections=connections, firewall=firewall,
         malware=malware, remote=remote, rules=rules,
         block_ip=block_ip, unblock_ip=unblock_ip,
-        quarantine=quarantine, json_out=json_out,
+        quarantine=quarantine, json_out=json_out, apply=apply,
     )
+
+
+# ── Guard (safe autonomous remediation) ─────────────────────────────────
+
+@app.command()
+def guard(
+    status: bool = typer.Option(False, "--status", help="Policy + last actions (default)"),
+    log: bool = typer.Option(False, "--log", help="Recent guard log"),
+    undo: bool = typer.Option(False, "--undo", help="Resume every paused process, restore every nice value"),
+    mode: Optional[str] = typer.Option(None, "--mode", help="off | dry-run | act"),
+    json_out: bool = typer.Option(False, "--json", help="JSON output"),
+):
+    """Safe autonomous remediation of runaway processes (allow-list, reversible, rate-limited)."""
+    from macmon_core.sentinel import run_guard
+    run_guard(status=status, log=log, undo=undo, mode=mode, json_out=json_out)
+
+
+# ── Local dashboard (read-only) ─────────────────────────────────────────
+
+@app.command()
+def web(
+    port: int = typer.Option(9137, "--port", help="Preferred loopback port (a free one if taken)"),
+    open_browser: bool = typer.Option(False, "--open", help="Open it in the default browser"),
+):
+    """Serve the read-only dashboard on 127.0.0.1 (Ctrl-C to stop)."""
+    import time as _t
+    from macmon_core import app_webui
+    _srv, real = app_webui.ensure_server(port)
+    print(app_webui.url_for(real), flush=True)
+    if open_browser:
+        app_webui.open_in_browser(real)
+    try:
+        while True:
+            _t.sleep(3600)
+    except KeyboardInterrupt:
+        app_webui.stop_server()
 
 
 # ── Docker Management ───────────────────────────────────────────────────

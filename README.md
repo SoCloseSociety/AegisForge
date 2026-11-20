@@ -82,10 +82,13 @@ macOS-only command exits cleanly with a "requires macOS" notice off-mac.
 | `network` / `flush-dns` | ✅ | ✅ | ✅ |
 | `docker` management | ✅ | ✅ | ✅ |
 | `health` score | ✅ | ✅ (core checks) | ✅ (core checks) |
-| **`sentinel`** monitor + auto-remediation | ✅ | ✅ (schtasks) | ✅ (cron) |
+| **`sentinel`** monitor + auto-remediation | ✅ | ✅ (schtasks) | ✅ (systemd --user timer, cron fallback) |
+| **`guard`** safe autonomous remediation <sup>3</sup> | opt-in | opt-in | ✅ (dry-run by default) |
 | Live `dashboard` (TUI) | ✅ | ✅ | ✅ |
 | `security` (pf, SIP, FileVault, Gatekeeper) | ✅ | -- | -- |
-| `privacy` / `startup` / `uninstall` / `auto` / `focus` | ✅ | -- | -- |
+| `security` (nftables/ufw, listening ports, SSH, AppArmor, updates, LUKS, failed logins, sudoers, PATH, Secure Boot, fail2ban) <sup>4</sup> | -- | -- | ✅ |
+| `startup` (systemd units + XDG autostart) / `uninstall` (apt, flatpak, pipx, pip --user) / `auto` | ✅ | -- | ✅ |
+| `privacy` / `focus` | ✅ | -- | -- |
 
 <sup>1</sup> Core paths only (temp, caches, logs, dev caches) route through the
 cross-platform layer. `clean --browsers` still uses macOS browser-profile paths
@@ -94,6 +97,19 @@ cross-platform layer. `clean --browsers` still uses macOS browser-profile paths
 <sup>2</sup> Core scanning (node_modules, venvs, `__pycache__`, Docker, npm /
 pnpm / yarn / bun) is cross-platform, and the pip cache is resolved per OS
 (`~/Library/Caches/pip`, `%LOCALAPPDATA%\pip\Cache`, `$XDG_CACHE_HOME/pip`).
+
+<sup>3</sup> `aegis guard`: only processes on an allow-list (background indexers and
+thumbnailers by default) are ever touched; interactive apps, the desktop session,
+shells, system services, containers, the VPN and local LLM runtimes are protected by
+name, command line and systemd unit. The ladder is renice, then pause (always
+resumed after 5 min), then terminate only if `guard_allow_kill` is set. In `act`
+mode every step is logged as a dry-run on an earlier sample first, at most 6 actions
+an hour, and `aegis guard --undo` reverts everything.
+
+<sup>4</sup> Read-only by default; as a normal user the checks that need root say
+so (N/A) instead of guessing. `--apply` (root) only runs the low-risk fixes
+(unattended upgrades, `chmod o-w` on PATH directories, sudoers file modes):
+SSH and firewall changes are never automatic.
 
 On Windows/Linux install with `uvx` / `pipx` / `pip` (see [Installation](#installation)),
 or clone + `pip install -r requirements.txt` and run `python macmon.py` (the

@@ -10,7 +10,7 @@ import psutil
 from rich.panel import Panel
 from rich.table import Table
 
-from .platform_compat import IS_MAC, load_average
+from .platform_compat import IS_LINUX, IS_MAC, load_average
 from .utils import (
     console,
     dir_size,
@@ -208,6 +208,15 @@ def _run_all_checks() -> list[dict]:
             "fix_hint": "Run `aegis clean --all` for first cleanup",
             "value": 999,
         })
+
+    # Linux rows: memory pressure (PSI), OOM kills, extra data volumes,
+    # hwmon temperatures (amdgpu included), failed systemd units.
+    if IS_LINUX:
+        try:
+            from . import linux_system
+            checks.extend(linux_system.health_checks())
+        except Exception:
+            pass
 
     # macOS updates (macOS only -- softwareupdate/defaults)
     if IS_MAC:

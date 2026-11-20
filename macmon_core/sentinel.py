@@ -40,7 +40,8 @@ from rich.text import Text
 from . import aegis
 from .aegis import AEGIS_THEME, BRAND, C, ENGINE, LEVEL_STYLE, TAGLINE
 from .utils import MACMON_DIR, console
-from .platform_compat import IS_MAC, IS_WINDOWS, OS_NAME, load_average, notify as _os_notify, require_os
+from . import guard as _guard
+from .platform_compat import IS_LINUX, IS_MAC, IS_WINDOWS, OS_NAME, load_average, notify as _os_notify, require_os
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 # venv interpreter path differs on Windows (.venv/Scripts/python.exe)
@@ -52,6 +53,13 @@ ALERTS_LOG = MACMON_DIR / "sentinel_alerts.log"
 ASTATE = MACMON_DIR / "sentinel.state"
 SEQ = MACMON_DIR / ".sentinel_seq"
 CONF = MACMON_DIR / "sentinel.conf"
+# Machine-wide defaults (an OS image ships its policy here, the user's
+# sentinel.conf still wins key by key). Absent on a normal install.
+SYSTEM_CONF = Path(os.environ.get("AEGIS_SYSTEM_CONF", "/etc/aegis/sentinel.json"))
+GUARD_LOG = MACMON_DIR / "guard.jsonl"
+STATUS = MACMON_DIR / "status.json"   # one compact snapshot per sample (widgets, the app)
+SYSTEMD_UNIT = "aegis-sentinel"       # Linux: systemd --user service + timer
+_UNIT_MARK = "# written by `aegis sentinel --install` (removed by --uninstall)"
 MONITOR_LABEL = "co.soclose.macmon.monitor"
 WEEKLY_LABEL = "co.soclose.macmon.weekly"
 MAX_BYTES = 5 * 1024 * 1024
@@ -117,17 +125,28 @@ DEFAULTS = {
     "reap_idle_samples": 5,   # a leak must be idle (<1% CPU) this many samples (~5 min) first
     "reap_families": ["headless", "node", "python"],  # which leak families may be reaped
     "reap_max": 40,           # at most this many per cycle
+    # ── Notifications: an optional command instead of the OS notifier. argv
+    # template, placeholders {title} {body} {urgency}; env added from notify_env.
+    "notify_cmd": [],
+    "notify_env": {},
+    # ── Linux security audit inside the sampler (read-only, as this user) ──
+    "security_every_s": 21600,  # re-run the audit every 6 h (0 = never)
+    "security_alert_below": 60, # notify when the score drops under this
 }
+DEFAULTS.update(_guard.DEFAULTS)   # the guard policy (see guard.py): safe by default
 
 
 # ── Config ───────────────────────────────────────────────────────────────
 
 def _conf() -> dict:
     cfg = dict(DEFAULTS)
-    try:
-        cfg.update(json.loads(CONF.read_text()))
-    except Exception:
-        pass
+    for src in (SYSTEM_CONF, CONF):
+        try:
+            data = json.loads(src.read_text())
+            if isinstance(data, dict):
+                cfg.update(data)
+        except Exception:
+            pass
     return cfg
 
 
@@ -225,7 +244,29 @@ def _build_notifier():
         return False
 
 
-def _notify(title: str, msg: str):
+def _notify_cmd(cfg, title: str, msg: str, urgency: str) -> bool:
+    """Run the configured notify_cmd (e.g. a desktop's own notification
+    helper). True when it ran; any failure falls back to the OS notifier."""
+    tpl = cfg.get("notify_cmd") or []
+    if not isinstance(tpl, list) or not tpl:
+        return False
+    argv = [str(a).replace("{title}", title).replace("{body}", msg).replace("{urgency}", urgency) for a in tpl]
+    if not shutil.which(argv[0]) and not os.path.isfile(argv[0]):
+        return False
+    env = dict(os.environ)
+    extra = cfg.get("notify_env") or {}
+    if isinstance(extra, dict):
+        env.update({str(k): str(v) for k, v in extra.items()})
+    try:
+        subprocess.run(argv, capture_output=True, timeout=10, stdin=subprocess.DEVNULL, env=env)
+        return True
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _notify(title: str, msg: str, urgency: str = "normal"):
+    if _notify_cmd(_conf(), title, msg, urgency):
+        return
     # Non-macOS: use the platform notifier (PowerShell toast / notify-send).
     if not IS_MAC:
         _os_notify(title, msg)
@@ -648,14 +689,90 @@ def run_sample():
     except Exception as e:
         fired.append(("error", f"auto-reap skipped this sample: {e!r}"))
 
+    # ── The guard (Linux default: dry-run; see guard.py for the safety rules) ──
+    gsum = None
+    try:
+        g = astate.setdefault("guard", {})
+        ram_crit = vm.percent > cfg["ram_critical"]
+        entries = _guard.step(table, cfg, g, now, ram_critical=ram_crit)
+        if entries:
+            with open(GUARD_LOG, "a") as f:
+                for e in entries:
+                    f.write(json.dumps(e) + "\n")
+        for e in entries:
+            urg = "low" if e["kind"] in ("would", "resume") else "normal"
+            _notify(f"{ALERT_TITLE} guard", e["msg"], urg)
+            fired.append(("guard_" + e["kind"], e["msg"]))
+        gsum = _guard.summary(g, _guard_log_tail(200), cfg, now)
+    except Exception as e:
+        fired.append(("error", f"guard skipped this sample: {e!r}"))
+
+    # ── Linux security audit, every security_every_s (read-only, as this user) ──
+    sec = astate.get("_security") or {}
+    try:
+        every = aegis._int(cfg, "security_every_s", 21600)
+        if IS_LINUX and every and now - int(sec.get("at", 0)) >= every:
+            from . import linux_security
+            res = linux_security.audit(with_processes=False)
+            fails = sorted(c["name"] for c in res["checks"] if c["status"] == "fail")
+            new_fails = [n for n in fails if n not in (sec.get("fails") or [])]
+            sec = {"at": now, "score": res["score"], "coverage": res["coverage"], "fails": fails,
+                   "warns": sorted(c["name"] for c in res["checks"] if c["status"] == "warn")}
+            astate["_security"] = sec
+            low = res["score"] < aegis._int(cfg, "security_alert_below", 60)
+            if new_fails or (low and now - astate.get("security", 0) >= 86400):
+                astate["security"] = now
+                msg = (f"Security score {res['score']}/100" +
+                       (f" -- new problem: {', '.join(new_fails)}" if new_fails else "") +
+                       ". Details: aegis security --scan")
+                _notify(f"{ALERT_TITLE}: security", msg, "critical" if new_fails else "normal")
+                fired.append(("security", msg))
+    except Exception as e:
+        fired.append(("error", f"security audit skipped this sample: {e!r}"))
+
     try:
         ASTATE.write_text(json.dumps(astate))
     except Exception:
         pass
+    _write_status(rec, gsum, sec, fired, now)
     if fired:
         with open(ALERTS_LOG, "a") as f:
             for key, msg in fired:
                 f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now))}  {key}: {msg}\n")
+
+
+def _guard_log_tail(n: int = 200) -> list[dict]:
+    rows = []
+    for line in _tail_lines(GUARD_LOG, n) if GUARD_LOG.exists() else []:
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            continue
+    return rows
+
+
+def _write_status(rec: dict, gsum, sec: dict, fired: list, now: int):
+    """status.json: what a widget or an app shows without re-measuring
+    (atomic replace, so a reader never sees half a file)."""
+    last = None
+    for key, msg in fired:
+        if key != "error":
+            last = {"key": key, "msg": msg, "ts": now}
+    if last is None:
+        try:
+            last = json.loads(STATUS.read_text()).get("last_alert")
+        except Exception:
+            last = None
+    snap = {"v": 1, "ts": now, "platform": OS_NAME,
+            "vitals": {k: rec.get(k) for k in ("cpu", "ram", "swap_gb", "load1", "disk_free_gb")},
+            "guard": gsum, "security": {k: sec.get(k) for k in ("at", "score", "coverage", "fails", "warns")}
+            if sec else None, "last_alert": last}
+    try:
+        tmp = STATUS.with_suffix(".tmp")
+        tmp.write_text(json.dumps(snap, default=str))
+        os.replace(tmp, STATUS)
+    except Exception:
+        pass
 
 
 def _fire_findings(findings, astate: dict, now: int) -> list:
@@ -954,10 +1071,114 @@ def _scheduler_has(label: str) -> bool:
         if IS_WINDOWS:
             r = _run(["schtasks", "/query", "/tn", _TASK_NAME])
             return r.returncode == 0
+        if label == MONITOR_LABEL and _systemd_user_ok():
+            r = _run(["systemctl", "--user", "is-active", f"{SYSTEMD_UNIT}.timer"])
+            if r.stdout.strip() == "active":
+                return True
         out = _run(["crontab", "-l"]).stdout
         return _TASK_NAME in out
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
+
+
+# ── Linux: systemd --user timer (cron only as the fallback) ──────────────
+
+_VENDOR_UNIT_DIRS = ("/usr/lib/systemd/user", "/usr/local/lib/systemd/user", "/etc/systemd/user")
+
+
+def _user_unit_dir() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "systemd" / "user"
+
+
+def _systemd_user_ok() -> bool:
+    """A reachable systemd user manager (a desktop session, or lingering)."""
+    if not IS_LINUX or not shutil.which("systemctl"):
+        return False
+    try:
+        return _run(["systemctl", "--user", "show-environment"], timeout=5).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _vendor_unit() -> bool:
+    """The timer ships with the OS image (installed machine-wide)."""
+    return any(Path(d, f"{SYSTEMD_UNIT}.timer").exists() for d in _VENDOR_UNIT_DIRS)
+
+
+def _systemd_units(cmd: list[str]) -> tuple[str, str]:
+    exec_line = " ".join(shlex.quote(c) for c in cmd)
+    service = f"""{_UNIT_MARK}
+[Unit]
+Description=AegisForge sentinel sample (one measurement, then exit)
+
+[Service]
+Type=oneshot
+ExecStart={exec_line}
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=120
+"""
+    timer = f"""{_UNIT_MARK}
+[Unit]
+Description=AegisForge sentinel (60 s sampler)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60s
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
+"""
+    return service, timer
+
+
+def _systemd_install(cmd: list[str]) -> tuple[bool, str]:
+    timer = f"{SYSTEMD_UNIT}.timer"
+    _run(["systemctl", "--user", "unmask", timer])
+    if not _vendor_unit():
+        d = _user_unit_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        svc_txt, tmr_txt = _systemd_units(cmd)
+        for name, txt in ((f"{SYSTEMD_UNIT}.service", svc_txt), (timer, tmr_txt)):
+            f = d / name
+            if f.exists() and _UNIT_MARK not in f.read_text(errors="replace"):
+                return (False, f"{f} exists and was not written by aegis -- left untouched")
+            f.write_text(txt)
+    _run(["systemctl", "--user", "daemon-reload"])
+    r = _run(["systemctl", "--user", "enable", "--now", timer])
+    if r.returncode == 0:
+        _cron_remove()   # never two schedulers
+    return (r.returncode == 0, r.stderr.strip())
+
+
+def _systemd_remove():
+    timer = f"{SYSTEMD_UNIT}.timer"
+    _run(["systemctl", "--user", "disable", "--now", timer])
+    if _vendor_unit():
+        # enabled machine-wide: only a user mask really stops it (undone by --install / --resume)
+        _run(["systemctl", "--user", "mask", "--now", timer])
+    d = _user_unit_dir()
+    for name in (f"{SYSTEMD_UNIT}.service", timer):
+        f = d / name
+        try:
+            if f.is_file() and not f.is_symlink() and _UNIT_MARK in f.read_text(errors="replace"):
+                f.unlink()
+        except OSError:
+            pass
+    _run(["systemctl", "--user", "daemon-reload"])
+
+
+def _cron_remove():
+    try:
+        cur = _run(["crontab", "-l"]).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return
+    if _TASK_NAME not in cur:
+        return
+    new = "\n".join(l for l in cur.splitlines() if _TASK_NAME not in l).strip() + "\n"
+    _run(["crontab", "-"], input=new)
 
 
 def show_status():
@@ -976,6 +1197,12 @@ def show_status():
     t.add_row("Auto-trim idle AI sessions", Text("ON" if trim else "OFF", style=AMBER if trim else DIM))
     t.add_row("Auto-reap leaked orphans", Text("ON (proven leaks only)" if reap_on else "OFF (notify-only)",
                                                style=EMBER if reap_on else DIM))
+    gm = _guard.mode_of(cfg)
+    t.add_row("Guard (runaway processes)", Text({"off": "OFF", "dry-run": "DRY-RUN (logs what it would do)",
+                                                 "act": "ACT (allow-listed, reversible, rate-limited)"}[gm],
+                                                style={"off": DIM, "dry-run": AMBER, "act": GREEN}[gm]))
+    if IS_LINUX:
+        t.add_row("Scheduler", Text("systemd --user timer" if _systemd_user_ok() else "cron", style=DIM))
     t.add_row("Metrics collected", Text(f"{len(_load(100000))} samples", style=DIM))
     console.print(Panel(t, title=_banner("status"), border_style=DIM, style=f"on {C['ground']}"))
 
@@ -1115,7 +1342,10 @@ def _schedule_install() -> tuple[bool, str]:
             r = _run(["schtasks", "/create", "/tn", _TASK_NAME, "/tr", tr,
                       "/sc", "minute", "/mo", "1", "/f"])
             return (r.returncode == 0, r.stderr.strip())
-        # Linux: cron (per-minute)
+        # Linux: a systemd --user timer when a user manager is reachable
+        if _systemd_user_ok():
+            return _systemd_install(cmd)
+        # otherwise cron (per-minute)
         # Quote each arg -- an unquoted join breaks if the repo/home path has a space.
         line = "* * * * * " + " ".join(shlex.quote(c) for c in cmd) + f"  # {_TASK_NAME}\n"
         cur = _run(["crontab", "-l"]).stdout
@@ -1135,10 +1365,10 @@ def _schedule_remove():
         elif IS_WINDOWS:
             _run(["schtasks", "/delete", "/tn", _TASK_NAME, "/f"])
         else:
-            cur = _run(["crontab", "-l"]).stdout
-            new = "\n".join(l for l in cur.splitlines() if _TASK_NAME not in l).strip() + "\n"
-            _run(["crontab", "-"], input=new)
-    except subprocess.TimeoutExpired:
+            if _systemd_user_ok():
+                _systemd_remove()
+            _cron_remove()
+    except (subprocess.TimeoutExpired, OSError):
         pass
 
 
@@ -1377,6 +1607,53 @@ def test_notify():
         _build_notifier()
     _notify(ALERT_TITLE, f"{TAGLINE} -- test notification, the {BRAND} icon is active.")
     console.print(Text(f"Test notification sent (with the {BRAND} icon).", style=MINT))
+
+
+def run_guard(status=False, log=False, undo=False, mode=None, json_out=False):
+    """`aegis guard`: the safe-remediation policy, its log, undo, mode switch."""
+    console.push_theme(AEGIS_THEME)
+    MACMON_DIR.mkdir(exist_ok=True)
+    cfg = _conf()
+    astate = _read_json(ASTATE, {})
+    g = astate.setdefault("guard", {})
+    if mode is not None:
+        m = mode.strip().lower()
+        if m not in _guard.MODES:
+            console.print(f"[red]--mode must be one of {', '.join(_guard.MODES)}[/]")
+            return
+        _write_conf({"guard_mode": m})
+        lines = _guard.undo(g) if m == "off" else []
+        ASTATE.write_text(json.dumps(astate))
+        console.print(f"Guard mode: [bold]{m}[/]" + (f" ({len(lines)} change(s) undone)" if lines else ""))
+        return
+    if undo:
+        lines = _guard.undo(g)
+        ASTATE.write_text(json.dumps(astate))
+        for line in lines or ["nothing to undo"]:
+            console.print("  " + line, markup=False)
+        return
+    rows = _guard_log_tail(200)
+    summ = _guard.summary(g, rows, cfg)
+    if json_out:
+        print(json.dumps({"summary": summ, "log": rows[-50:]}, default=str))
+        return
+    if log:
+        for r in rows[-30:] or []:
+            ts = time.strftime("%m-%d %H:%M", time.localtime(r.get("ts", 0)))
+            console.print(f"{ts}  {r.get('kind', ''):8s} {r.get('msg', '')}", markup=False)
+        if not rows:
+            console.print("No guard activity yet.")
+        return
+    t = Table.grid(padding=(0, 2))
+    t.add_row("Mode", Text(summ["mode"], style={"off": DIM, "dry-run": AMBER, "act": GREEN}[summ["mode"]]))
+    t.add_row("May act on (allow-list)", Text(", ".join(summ["allow"]) or "nothing", style=DIM))
+    t.add_row("Ladder", Text("renice -> pause (auto-resumed) -> " + ("terminate" if summ["kill"] else
+                             "notify only (terminate disabled)"), style=DIM))
+    t.add_row("Last 24 h", Text(f"{summ['acts_24h']} action(s), {summ['would_24h']} dry-run line(s)", style=DIM))
+    t.add_row("Paused now", Text(", ".join(summ["suspended"]) or "none", style=DIM))
+    if summ["last"]:
+        t.add_row("Last", Text(summ["last"].get("msg", ""), style=DIM))
+    console.print(Panel(t, title=_banner("guard"), border_style=DIM, style=f"on {C['ground']}"))
 
 
 def run_sentinel(sample=False, install_flag=False, uninstall_flag=False, watch=False,

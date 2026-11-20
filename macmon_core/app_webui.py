@@ -160,6 +160,12 @@ def security_dict() -> dict:
     # tools: off macOS they all read "could not check" and the tab would show a
     # confident ~95/100 on a box whose firewall/encryption were never inspected.
     # Gate it like the CLI (security.run_security) instead of pretending.
+    from .platform_compat import IS_LINUX
+    if IS_LINUX:
+        from . import linux_security
+        with engine_call():
+            r = linux_security.audit()
+        return {"score": r["score"], "findings": r["findings"], "coverage": r["coverage"], "at": time.time()}
     msg = require_os("macOS")
     if msg:
         return {"score": None, "findings": [], "error": msg, "at": time.time()}
@@ -280,8 +286,18 @@ def sentinel_dict() -> dict:
             {"key": "leaks", "name": "Leaked orphans", "what": "dev processes under PID 1 whose parent the sentinel watched die"},
         ],
         "samples": samples, "trends": trends, "at": now,
+        "guard": _guard_dict(cfg, now),
         "metrics_path": str(sentinel.METRICS), "conf_path": str(sentinel.CONF),
     }
+
+
+def _guard_dict(cfg: dict, now: float) -> dict:
+    from . import guard, sentinel
+    try:
+        g = (sentinel._read_json(sentinel.ASTATE, {}) or {}).get("guard", {})
+        return guard.summary(g, sentinel._guard_log_tail(200), cfg, now)
+    except Exception as e:
+        return {"mode": guard.mode_of(cfg), "error": str(e)}
 
 
 def _json(d) -> bytes:
