@@ -215,5 +215,12 @@ class TestContract:
         assert 'api("quarantine", g.pid, g.ct != null ? g.ct : null, !!g.guard && acked)' in JS
         assert "on a guarded process -- it will be killed and its binary blocked" in JS
 
+    def test_no_unsized_inline_svg_as_a_child(self):
+        # A bare icon(...) handed to h() is an <svg> with no size rule: WebKitGTK drew it at the
+        # 300x150 default with a black fill (a giant triangle across "All clear"). Every glyph
+        # placed in the layout goes through ico(), whose .ico span sizes it.
+        import re as _re
+        assert not _re.search(r'[,(]\s*icon\("', JS), "use ico(...) for a glyph inside an element"
+
     def test_protected_rows_carry_the_badge(self):
-        assert '"badge badge-protected"' in JS and 'icon("lock")' in JS and ".badge-protected" in CSS
+        assert '"badge badge-protected"' in JS and 'ico("lock")' in JS and ".badge-protected" in CSS

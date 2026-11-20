@@ -102,7 +102,7 @@
 
       <!-- Security -->
       <section class="view" id="view-security" data-view="security" aria-labelledby="h-security">
-        <div class="view-head"><span class="vh-ico" data-ico="shield"></span><div><h1 id="h-security">Security</h1><p>Firewall, SIP, Gatekeeper, FileVault, suspicious connections, remote tools, startup items, sharing and SSH -- scored /100.</p></div></div>
+        <div class="view-head"><span class="vh-ico" data-ico="shield"></span><div><h1 id="h-security">Security</h1><p>Firewall, disk encryption, system protections, updates, listening ports, SSH, remote tools and suspicious processes -- scored /100.</p></div></div>
         <div class="toolbar">
           <button class="btn btn-primary" id="sec-scan" type="button"><span class="ico" data-ico="shield"></span>Run security scan</button>
           <span class="muted" id="sec-note"></span>
@@ -162,7 +162,7 @@
         <div class="view-head"><span class="vh-ico" data-ico="mark"></span><div><h1 id="h-sentinel">AegisForge Sentinel</h1><p>The proactive layer: a 60s sampler, five anticipatory detectors (notify-only), and opt-in auto-remediation that is OFF unless you turn it on here.</p></div></div>
         <div class="two">
           <div class="card">
-            <div class="card-head"><h2>Sampler</h2><span class="card-note">LaunchAgent co.soclose.macmon.monitor</span></div>
+            <div class="card-head"><h2>Sampler</h2><span class="card-note">60 s sampler (LaunchAgent / systemd timer / scheduled task)</span></div>
             <div id="sn-status"></div>
           </div>
           <div class="card">

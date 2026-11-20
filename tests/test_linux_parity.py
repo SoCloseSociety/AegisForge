@@ -596,11 +596,20 @@ def test_systemd_units_text():
 
 def test_status_snapshot_is_atomic_json(tmp_path, monkeypatch):
     from macmon_core import sentinel
-    monkeypatch.setattr(sentinel, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(sentinel, "ASTATE", tmp_path / "sentinel.state")
     sentinel._write_status({"cpu": 5, "ram": 50}, {"mode": "act"}, {"at": 1, "score": 90}, [("disk", "low")], 100)
     d = json.loads((tmp_path / "status.json").read_text())
     assert d["guard"]["mode"] == "act" and d["security"]["score"] == 90 and d["last_alert"]["msg"] == "low"
     assert not (tmp_path / "status.tmp").exists()
+
+
+def test_redirected_state_never_writes_the_real_home(tmp_path, monkeypatch):
+    """status.json / guard.jsonl follow ASTATE: a run with its state pointed elsewhere (every
+    existing sampler test does that) must not touch the real ~/.macmon."""
+    from macmon_core import sentinel
+    monkeypatch.setattr(sentinel, "ASTATE", tmp_path / "x" / "sentinel.state")
+    assert sentinel._status_path() == tmp_path / "x" / "status.json"
+    assert sentinel._guard_log_path() == tmp_path / "x" / "guard.jsonl"
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux routing")

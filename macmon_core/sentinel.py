@@ -56,8 +56,20 @@ CONF = MACMON_DIR / "sentinel.conf"
 # Machine-wide defaults (an OS image ships its policy here, the user's
 # sentinel.conf still wins key by key). Absent on a normal install.
 SYSTEM_CONF = Path(os.environ.get("AEGIS_SYSTEM_CONF", "/etc/aegis/sentinel.json"))
-GUARD_LOG = MACMON_DIR / "guard.jsonl"
-STATUS = MACMON_DIR / "status.json"   # one compact snapshot per sample (widgets, the app)
+# guard.jsonl (the guard's log) and status.json (one compact snapshot per sample,
+# for widgets and the app) always live NEXT TO the state file: whoever points
+# ASTATE elsewhere (a test, a second profile) moves them too -- never a write
+# into the real ~/.macmon from a redirected run.
+
+
+def _guard_log_path() -> Path:
+    return ASTATE.with_name("guard.jsonl")
+
+
+def _status_path() -> Path:
+    return ASTATE.with_name("status.json")
+
+
 SYSTEMD_UNIT = "aegis-sentinel"       # Linux: systemd --user service + timer
 _UNIT_MARK = "# written by `aegis sentinel --install` (removed by --uninstall)"
 MONITOR_LABEL = "co.soclose.macmon.monitor"
@@ -696,7 +708,7 @@ def run_sample():
         ram_crit = vm.percent > cfg["ram_critical"]
         entries = _guard.step(table, cfg, g, now, ram_critical=ram_crit)
         if entries:
-            with open(GUARD_LOG, "a") as f:
+            with open(_guard_log_path(), "a") as f:
                 for e in entries:
                     f.write(json.dumps(e) + "\n")
         for e in entries:
@@ -743,7 +755,8 @@ def run_sample():
 
 def _guard_log_tail(n: int = 200) -> list[dict]:
     rows = []
-    for line in _tail_lines(GUARD_LOG, n) if GUARD_LOG.exists() else []:
+    log = _guard_log_path()
+    for line in _tail_lines(log, n) if log.exists() else []:
         try:
             rows.append(json.loads(line))
         except ValueError:
@@ -760,7 +773,7 @@ def _write_status(rec: dict, gsum, sec: dict, fired: list, now: int):
             last = {"key": key, "msg": msg, "ts": now}
     if last is None:
         try:
-            last = json.loads(STATUS.read_text()).get("last_alert")
+            last = json.loads(_status_path().read_text()).get("last_alert")
         except Exception:
             last = None
     snap = {"v": 1, "ts": now, "platform": OS_NAME,
@@ -768,9 +781,10 @@ def _write_status(rec: dict, gsum, sec: dict, fired: list, now: int):
             "guard": gsum, "security": {k: sec.get(k) for k in ("at", "score", "coverage", "fails", "warns")}
             if sec else None, "last_alert": last}
     try:
-        tmp = STATUS.with_suffix(".tmp")
+        dst = _status_path()
+        tmp = dst.with_suffix(".tmp")
         tmp.write_text(json.dumps(snap, default=str))
-        os.replace(tmp, STATUS)
+        os.replace(tmp, dst)
     except Exception:
         pass
 

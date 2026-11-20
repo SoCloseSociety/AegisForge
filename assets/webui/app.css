@@ -242,7 +242,7 @@ code { font-family: var(--font-mono); font-size: .92em; color: var(--text-2); ba
 .worst.sev-high { color: var(--sev-high); border-color: var(--tint-ember-line); background: var(--tint-ember); }
 .worst.sev-critical { color: var(--sev-critical); border-color: var(--tint-bad-line); background: var(--tint-bad); animation: pulse-ring 1.6s var(--ease-in-out) infinite; }
 @keyframes pulse-ring { 0%, 100% { box-shadow: 0 0 0 0 var(--tint-bad-line); } 50% { box-shadow: 0 0 0 4px transparent; } }
-.chips { display: flex; gap: var(--sp-2); flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); flex: 1 1 0; min-width: 0; padding: 2px 0; }   /* wraps: a vital is never hidden behind the edge */
 .chips::-webkit-scrollbar { display: none; }
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); padding: 4px 9px; border-radius: var(--r-full); background: var(--surface); border: 1px solid var(--border); color: var(--muted); white-space: nowrap; flex: 0 0 auto; }
 .chip b { color: var(--text); font-weight: 600; }
@@ -447,12 +447,13 @@ body.is-stale .vital .v { opacity: .7; }
 .score-row { display: flex; gap: var(--sp-5); align-items: center; margin-bottom: var(--sp-3); flex-wrap: wrap; }
 .sec-list { display: flex; flex-direction: column; gap: 6px; }
 .sec-item { padding: 9px 12px; border-radius: var(--r-sm); background: var(--bg-2); border: 1px solid var(--border); border-left: 3px solid var(--sev-ok); }
-.sec-item.st-warn { border-left-color: var(--sev-medium); }  .sec-item.st-fail { border-left-color: var(--sev-critical); }
+.sec-item.st-warn { border-left-color: var(--sev-medium); }  .sec-item.st-fail { border-left-color: var(--sev-critical); }  .sec-item.st-unknown { border-left-color: var(--muted); }
 .sec-item .row { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .sec-item .nm { font-weight: 600; color: var(--text); }
 .sec-item .dt { color: var(--muted); flex: 1; min-width: 12ch; }
 .sec-item .hint { color: var(--text-2); font-size: var(--fs-sm); margin-top: 4px; }
 .sec-item ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-family: var(--font-mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.sec-item details.more { margin-top: 4px; }  .sec-item details.more summary { cursor: pointer; color: var(--accent); font-size: var(--fs-sm); }
 
 /* ── 12. Docker: stats + tabs ──────────────────────────────────────────── */
 .stat-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }

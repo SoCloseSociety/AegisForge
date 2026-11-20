@@ -139,7 +139,7 @@ function toast(msg, kind = "ok", ms = 4200) {
   let t;
   const dismiss = () => { if (!t.isConnected) return; t.classList.add("is-leaving"); setTimeout(() => t.remove(), 200); };
   t = h("div", { class: `toast t-${kind}` }, ico(TOAST_ICON[kind] || "info"), h("div", { class: "tx" }, msg),
-    h("button", { class: "close", type: "button", "aria-label": "Dismiss", onclick: dismiss }, icon("x")));
+    h("button", { class: "close", type: "button", "aria-label": "Dismiss", onclick: dismiss }, ico("x")));
   $("toasts").appendChild(t);
   setTimeout(dismiss, ms);
 }
@@ -279,7 +279,7 @@ async function tick() {
   renderVitals(d.vitals || {});
   const F = clear($("findings"));
   if (d.error) F.appendChild(h("div", { class: "finding sev-medium" }, h("span", { class: "lvl" }, "engine"), h("span", { class: "tx" }, String(d.error))));
-  if (!d.findings || !d.findings.length) F.appendChild(h("div", { class: "calm" }, icon("check"), "All clear -- forge cold."));
+  if (!d.findings || !d.findings.length) F.appendChild(h("div", { class: "calm" }, ico("check"), "All clear -- forge cold."));
   else for (const f of [...d.findings].sort((a, b) => (SEV_RANK[b.severity] || 0) - (SEV_RANK[a.severity] || 0))) F.appendChild(findingNode(f));
   const A = clear($("alerts"));
   if (!d.alerts || !d.alerts.length) A.appendChild(emptyState("inbox", "No recent alerts", "The sentinel writes here when a detector fires."));
@@ -319,7 +319,7 @@ function renderProcs() {
   for (const p of rows.slice(0, 120)) {
     const stopped = p.status === "stopped";
     const acts = h("td", { class: "actions" });
-    if (p.protected) acts.appendChild(h("span", { class: "badge badge-protected", title: "Never a target: protected by the engine." }, icon("lock"), "protected"));
+    if (p.protected) acts.appendChild(h("span", { class: "badge badge-protected", title: "Never a target: protected by the engine." }, ico("lock"), "protected"));
     else {
       acts.appendChild(h("button", { class: "btn btn-xs btn-ghost", type: "button", disabled: !bridge.ready, onclick: () => signalFunnel(stopped ? "resume" : "suspend", p) }, stopped ? "Resume" : "Suspend"));
       acts.appendChild(h("button", { class: "btn btn-xs btn-danger", type: "button", disabled: !bridge.ready, onclick: () => signalFunnel("kill", p) }, "Kill"));
@@ -396,7 +396,7 @@ function renderClean() {
   } else if (s === "review") {
     stepper($("clean-stepper"), 1);
     const cats = clean.scan.categories;
-    if (!cats.length) { st.appendChild(h("div", { class: "calm" }, icon("check"), "Nothing to clean -- the system is already clean.")); st.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { clean.state = "idle"; renderClean(); } }, "Back")); return; }
+    if (!cats.length) { st.appendChild(h("div", { class: "calm" }, ico("check"), "Nothing to clean -- the system is already clean.")); st.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { clean.state = "idle"; renderClean(); } }, "Back")); return; }
     const picks = h("div", { class: "picks" }, cats.map((c) => h("label", { class: "pick" }, h("input", { type: "checkbox", checked: clean.picked.has(c.id), onchange: (e) => { if (e.target.checked) clean.picked.add(c.id); else clean.picked.delete(c.id); renderClean(); } }), h("span", { class: "pk-name" }, c.name), h("span", { class: "pk-count" }, `${c.count} item${c.count === 1 ? "" : "s"}`), h("span", { class: "pk-size" }, c.size_label))));
     const sel = cats.filter((c) => clean.picked.has(c.id)), selBytes = sel.reduce((a, c) => a + c.size, 0);
     st.appendChild(h("div", { class: "stage-hero" }, h("h3", null, "Review what goes to the Trash"), h("p", null, `Found ${clean.scan.total_label} across ${cats.length} categories. Untick anything you want to keep.`)));
@@ -436,22 +436,33 @@ async function cleanConfirm() {
 views.clean = { enter() { renderClean(); } };
 
 // ── Security: scan -> scored findings; quarantine funnel ────────────────
+// Long detail (ports, paths, pids) stays folded: a failing check shows its first 3 lines, a
+// passing one shows none until asked; the rest sits behind a native <details> "show more".
+function secItems(f) {
+  const items = (f.items || []).slice(0, 40).map(String);
+  if (!items.length) return null;
+  const head = f.status === "fail" || f.status === "warn" ? items.slice(0, 3) : [];
+  const rest = items.slice(head.length);
+  return h("div", null, head.length ? h("ul", null, head.map((x) => h("li", null, x))) : null,
+    rest.length ? h("details", { class: "more" }, h("summary", null, `show ${rest.length} more`), h("ul", null, rest.map((x) => h("li", null, x)))) : null);
+}
 const sec = { busy: false };
 async function secScan() {
   if (sec.busy) return; sec.busy = true; $("sec-scan").disabled = true;
-  show($("sec-result"), h("div", { class: "card" }, working("firewall, SIP, Gatekeeper, FileVault, connections, remote tools, processes, startup items, sharing, SSH..."), skeleton(5)));
+  show($("sec-result"), h("div", { class: "card" }, working("firewall, encryption, updates, listening ports, remote tools, processes, startup items, SSH..."), skeleton(5)));
   try {
     const d = await get("/api/security");
     if (d.error) { show($("sec-result"), h("div", { class: "card" }, errBox(d.error))); $("sec-note").textContent = ""; return; }
-    const order = { fail: 0, warn: 1, pass: 2 };
-    const items = [...(d.findings || [])].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+    const order = { fail: 0, warn: 1, unknown: 2, pass: 3 };
+    const items = [...(d.findings || [])].sort((a, b) => (order[a.status] ?? 4) - (order[b.status] ?? 4));
     const fails = items.filter((f) => f.status === "fail").length, warns = items.filter((f) => f.status === "warn").length;
+    const unknown = items.filter((f) => f.status === "unknown").length;
     show($("sec-result"), h("div", { class: "card" },
-      h("div", { class: "score-row" }, ring(d.score), h("div", null, h("div", { class: "big" }, `${d.score}`, h("small", null, "/100 security score")), h("div", { class: "muted" }, `${fails} fail · ${warns} warn · ${items.length - fails - warns} pass`))),
+      h("div", { class: "score-row" }, ring(d.score), h("div", null, h("div", { class: "big" }, `${d.score}`, h("small", null, "/100 security score")), h("div", { class: "muted" }, `${fails} fail · ${warns} warn · ${items.length - fails - warns - unknown} pass` + (unknown ? ` · ${unknown} need root (N/A)` : "") + (d.coverage ? ` · checked ${d.coverage}` : "")))),
       h("div", { class: "sec-list" }, items.map((f) => h("div", { class: "sec-item st-" + f.status },
-        h("div", { class: "row" }, h("span", { class: "badge badge-" + ({ pass: "ok", warn: "warn", fail: "fail" }[f.status] || "") }, f.status), h("span", { class: "nm" }, f.name), h("span", { class: "dt" }, f.detail)),
-        f.status !== "pass" && f.fix_hint ? h("div", { class: "hint" }, f.fix_hint) : null,
-        f.items && f.items.length ? h("ul", null, f.items.slice(0, 12).map((x) => h("li", null, String(x)))) : null)))));
+        h("div", { class: "row" }, h("span", { class: "badge badge-" + ({ pass: "ok", warn: "warn", fail: "fail" }[f.status] || "") }, f.status === "unknown" ? "n/a" : f.status), h("span", { class: "nm" }, f.name), h("span", { class: "dt" }, f.detail)),
+        (f.status === "fail" || f.status === "warn") && f.fix_hint ? h("div", { class: "hint" }, f.fix_hint) : null,
+        secItems(f))))));
     $("sec-note").textContent = `scanned ${new Date().toLocaleTimeString()}`;
   } catch (e) { show($("sec-result"), h("div", { class: "card" }, errBox("scan failed: " + e.message, secScan))); }
   finally { sec.busy = false; $("sec-scan").disabled = false; }
@@ -542,7 +553,7 @@ async function loadBig() {
   try {
     const d = await get(`/api/bigfiles?path=${encodeURIComponent(p)}&min=${encodeURIComponent($("big-min").value)}`);
     if (d.error) { show(box, h("div", { class: "pad" }, errBox(d.error))); return; }
-    if (!d.files.length) { show(box, h("div", { class: "pad calm" }, icon("check"), "No file that big under " + d.path)); return; }
+    if (!d.files.length) { show(box, h("div", { class: "pad calm" }, ico("check"), "No file that big under " + d.path)); return; }
     show(box, h("table", { class: "table" }, h("thead", null, h("tr", null, h("th", null, "Path"), h("th", null, "Category"), h("th", null, "Modified"), h("th", { class: "num" }, "Size"), h("th", { class: "actions" }, ""))),
       h("tbody", null, d.files.map((f) => h("tr", null, h("td", { class: "path", title: f.path }, f.path.replace(/^\/Users\/[^/]+/, "~")), h("td", null, h("span", { class: "badge" }, f.category)), h("td", { class: "muted tnum" }, new Date(f.mtime * 1000).toISOString().slice(0, 10)), h("td", { class: "num" }, f.size_label),
         h("td", { class: "actions" }, h("button", { class: "btn btn-xs btn-ghost", type: "button", disabled: !bridge.ready, title: "Reveal in Finder", onclick: async () => { try { const r = await api("reveal", f.path); if (!r.ok) toast(r.detail, "bad"); } catch (e) { toast(e.message, "bad"); } } }, ico("external"), "Reveal")))))),
@@ -567,6 +578,13 @@ function renderSentinel() {
   st.appendChild(h("div", { class: "status-line" }, h("span", { class: "lamp " + (d.sampler_active ? "on" : "off"), "aria-hidden": "true" }), h("b", null, d.sampler_active ? "ACTIVE" : "STOPPED"), h("span", { class: "muted" }, d.sampler_active ? "sampling every 60 s" : "paused -- no new samples, no alerts"), h("span", { class: "grow" }),
     d.sampler_active ? h("button", { class: "btn btn-warn btn-sm", type: "button", disabled: !bridge.ready, onclick: () => sentinelToggle("pause") }, ico("pause"), "Pause") : h("button", { class: "btn btn-primary btn-sm", type: "button", disabled: !bridge.ready, onclick: () => sentinelToggle("resume") }, ico("play"), "Resume")));
   st.appendChild(kvRows([["weekly health agent", d.weekly_active == null ? "macOS only" : d.weekly_active ? "ACTIVE" : "STOPPED"], ["samples on disk", d.samples], ["metrics", d.metrics_path], ["passwordless purge", d.is_mac ? (d.purge_ready ? "configured" : "not configured (aegis sentinel --setup-purge)") : "macOS only"]]));
+  const g = d.guard || {};
+  if (g.mode) st.appendChild(kvRows([
+    ["guard", ({ act: "ACT -- allow-listed, reversible, rate-limited", "dry-run": "DRY-RUN -- logs what it would do", off: "OFF" }[g.mode] || g.mode)],
+    ["guard, last 24 h", `${g.acts_24h || 0} action(s) · ${g.would_24h || 0} dry-run line(s)`],
+    ["guard may act on", (g.allow || []).join(", ") || "nothing"],
+    ["paused by the guard", (g.suspended || []).join(", ") || "none"],
+    ["last guard event", g.last ? g.last.msg : "none yet"]]));
   const tr = clear($("sn-trends")), t = d.trends || {};
   if (!t.points) { tr.appendChild(emptyState("clock", "No history yet", "The sampler needs a few minutes of samples before a slope means anything.")); $("sn-trend-note").textContent = ""; }
   else {
